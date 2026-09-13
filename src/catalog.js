@@ -9,8 +9,10 @@ if(form){
  function refresh(){
   const query=fields.q.value.trim().toLowerCase();let count=0;
   const sorted=fields.sort.value==='name'?[...cards].sort((a,b)=>a.dataset.name.localeCompare(b.dataset.name)):cards;
+  const focused=document.activeElement;
   grid.append(...sorted);
   for(const card of cards){const d=card.dataset;const match=(!query||(d.name+' '+card.querySelector('p').textContent).toLowerCase().includes(query))&&(!fields.category.value||d.category===fields.category.value)&&(!fields.tone.value||d.tone===fields.tone.value)&&(!fields.plan.value||d.plan===fields.plan.value)&&(!fields.favorites.checked||favorites.has(d.id));card.hidden=!match;if(match)count++;const b=favoriteButtons.get(d.id);b.setAttribute('aria-pressed',String(favorites.has(d.id)));b.textContent=favorites.has(d.id)?'★':'☆';}
+  if(focused?.classList.contains('favorite')){if(!focused.closest('.world-card').hidden)focused.focus({preventScroll:true});else fields.favorites.focus({preventScroll:true});}
   document.querySelector('#catalog-count').textContent=`${count} ${count===1?'world':'worlds'}${fields.favorites.checked?' in your favorites':''}`;
   document.querySelector('#catalog-empty').hidden=count!==0;
   const params=new URLSearchParams();for(const key of ['q','category','tone','plan','sort'])if(fields[key].value&&fields[key].value!=='featured')params.set(key,fields[key].value);if(fields.favorites.checked)params.set('favorites','1');
