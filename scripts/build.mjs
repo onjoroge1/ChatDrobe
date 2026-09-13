@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {layout,home,catalog,world,documents,documentPage} from '../src/render.mjs';
 import {enhance} from '../src/enhance.mjs';
+import {finalizeSite} from '../src/release.mjs';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read=p=>JSON.parse(fs.readFileSync(path.join(root,p),'utf8'));
 const config=read('site.config.json'),themes=read('src/themes.json'),art=read('src/art.json');
@@ -19,6 +20,6 @@ page('/themes/','Explore original theme worlds',catalog(themes));
 for(const t of themes){page('/themes/'+t.id+'/',t.name+' theme for your workspace',world(t,themes),t.description+' Preview this original ChatDrobe theme and download appearance settings.');write('downloads/appearances/'+t.id+'.json',JSON.stringify({format:'chatdrobe-appearance',version:1,prefs:{theme:t.id,enabled:true,motion:false,decoration:true}},null,2)+'\n');}
 for(const[route,doc]of Object.entries(documents(config)))page(route,doc.title,documentPage(doc.title,doc.content));
 write('404.html',layout({title:'This world is not here',body:documentPage('A wrong turn, not a dead end.','<p>The page could not be found. <a href="/themes/">Find a theme</a> or <a href="/">go home</a>.'),path:'/404/',config}));
-write('robots.txt','User-agent: *\nDisallow: /\n');
+const release=finalizeSite(output,config,routes);
 write('build-manifest.json',JSON.stringify({websiteVersion:'0.3.0',extensionVersion:config.extensionVersion,routes,themes:themes.length},null,2)+'\n');
-console.log(`Built ${routes.length} pages and ${themes.length} appearance files. Preview indexing disabled.`);
+console.log(`Built ${routes.length} pages and ${themes.length} appearance files. Indexing: ${release.indexable?'enabled':'disabled'}.`);
