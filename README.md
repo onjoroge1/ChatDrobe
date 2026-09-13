@@ -37,3 +37,9 @@ Import this repository into Vercel with framework **Other**, root directory `.`,
 ## Source ownership
 
 Original ChatDrobe theme artwork and website source. No open-source license is granted by this repository. ChatDrobe is independent of OpenAI; ChatGPT is OpenAI's trademark. Brand/domain clearance remains a launch gate.
+
+## Website completion and release checks
+
+The full site contains 22 routes plus a 404 page, original world previews, filters and local favorites, a safe reading-settings showroom, real appearance downloads/imports and shareable looks. It remains a private-beta companion, not a paid-service backend.
+
+See [release and stack instructions](docs/RELEASE.md) and the [validation record](docs/VALIDATION.md). `Website quality` CI builds the site, validates content/security contracts and runs an HTTP Chromium suite. Set `SITE_URL` only after choosing an approved origin; indexing additionally requires `SITE_INDEXABLE=true` and `VERCEL_ENV=production`. No checkout or public extension link is fabricated when configuration is absent.
