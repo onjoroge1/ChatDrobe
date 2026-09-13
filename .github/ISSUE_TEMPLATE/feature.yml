@@ -1,0 +1,16 @@
+name: Website improvement
+description: Suggest a website improvement with a concrete user benefit.
+title: '[Website idea] '
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What should be easier or better?
+      description: Describe the task and who benefits. Reports are public; use sample data.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: How would we know it works?
+      description: Suggest observable acceptance criteria.
