@@ -1,5 +1,5 @@
 /* Appearance v1 contract compatible with extension 0.2.0; no arbitrary CSS or code. */
-export const IDS=Object.freeze(['mooncat','circuit','comic','aurora','paper','midnight','forest','ocean','starlit','reactor','sentinel','arcade']);
+export const IDS=Object.freeze(['mooncat','circuit','comic','aurora','paper','midnight','forest','ocean','starlit','reactor','sentinel','arcade','rally','bridge','observatory']);
 export const DEFAULTS=Object.freeze({font:'system',fontSize:16,lineHeight:1.65,width:850,decoration:true,focus:false,bubbles:true});
 const number=(n,min,max,fallback)=>typeof n==='number'&&Number.isFinite(n)?Math.min(max,Math.max(min,n)):fallback;
 export function normalize(value={},theme='mooncat'){

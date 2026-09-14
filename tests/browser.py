@@ -44,7 +44,7 @@ try:
                 expect(page.locator('h1')).to_have_count(1)
                 expect(page.locator('main')).to_be_visible()
                 assert 'script-src' in response.headers.get('content-security-policy', '')
-            checks.append('All 22 routes load over HTTP with security headers and one main heading')
+            checks.append('All 25 routes load over HTTP with security headers and one main heading')
             assert page.goto(BASE + '/not-a-real-page/').status == 404
             checks.append('Unknown paths return HTTP 404')
             page.goto(BASE)
@@ -116,7 +116,7 @@ try:
             context2 = browser.new_context(java_script_enabled=False)
             page2 = context2.new_page()
             page2.goto(BASE + '/themes/')
-            expect(page2.locator('.world-card')).to_have_count(12)
+            expect(page2.locator('.world-card')).to_have_count(15)
             page2.goto(BASE + '/themes/mooncat/')
             expect(page2.get_by_role('link', name='Download appearance')).to_be_visible()
             context2.close()

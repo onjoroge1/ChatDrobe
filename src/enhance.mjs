@@ -1,4 +1,5 @@
 import {escape} from './render.mjs';
+import {explorerContent} from './explorer.mjs';
 export function enhance(html,route,themes){
  // Normalize the migrated homepage's redundant closing section; browser output is unchanged.
  html=html.replace('</div></section></section></main>','</div></section></main>');
@@ -13,5 +14,5 @@ export function enhance(html,route,themes){
  html=html.replace(`<div id="showroom-controls" data-theme-id="${theme.id}"></div>`,controls).replace('</head>','<script type="module" src="/assets/showroom.js"></script></head>');
  }
  if(route==='/privacy/')html=html.replace('<h2>The extension</h2>','<h2>Website favorites and shared looks</h2><p>Only when you save a favorite do we store its theme ID in localStorage under chatdrobe:favorites:v1. Use Clear saved favorites in the catalog to remove it. Favorites do not sync across devices. Shared look URLs contain only validated appearance settings, not conversation data. Imported appearance files are read locally and are not uploaded.</p><h2>The extension</h2>');
- return html.replace('</head>','<link rel="stylesheet" href="/assets/experience.css"></head>');
+ return explorerContent(html,route,themes).replace('</head>','<link rel="stylesheet" href="/assets/experience.css"></head>');
 }

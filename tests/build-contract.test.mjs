@@ -53,7 +53,7 @@ test('a clean hosted-like build writes and verifies all deployment artifacts', t
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Verified deployable output at/);
   assert.equal(verifyBuildOutput(path.join(dir, 'dist')), 7);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'dist/build-manifest.json'))).routes.length, 22);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'dist/build-manifest.json'))).routes.length, 25);
   assert.match(fs.readFileSync(path.join(dir, 'dist/robots.txt'), 'utf8'), /Disallow: \//);
 });
 
