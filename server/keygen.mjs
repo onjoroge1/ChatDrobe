@@ -1,0 +1,13 @@
+import {generateKeyPairSync, createHash} from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+const folder = process.argv[2];
+if (!folder) throw new Error('Usage: node server/keygen.mjs /private/path/outside-the-repository');
+const out = path.resolve(folder), repo = path.resolve(new URL('../', import.meta.url).pathname);
+if (out === repo || out.startsWith(repo + path.sep)) throw new Error('Choose a private directory outside this repository.');
+fs.mkdirSync(out, {recursive: true, mode: 0o700});
+const {privateKey, publicKey} = generateKeyPairSync('ec', {namedCurve: 'prime256v1'});
+const jwk = publicKey.export({format: 'jwk'});
+fs.writeFileSync(path.join(out, 'billing-private.pem'), privateKey.export({type: 'pkcs8', format: 'pem'}), {mode: 0o600, flag: 'wx'});
+fs.writeFileSync(path.join(out, 'billing-public.json'), JSON.stringify({keyId: createHash('sha256').update(JSON.stringify(jwk)).digest('hex').slice(0,16), publicJwk: jwk}, null, 2), {mode: 0o600, flag: 'wx'});
+console.log('Created private signing key and public verification configuration. No private key was printed.');

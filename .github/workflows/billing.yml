@@ -1,0 +1,40 @@
+name: Billing test-mode checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: billing-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  billing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated_test_only
+          POSTGRES_DB: chatdrobe_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d chatdrobe_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install server-only database driver
+        run: npm --prefix server install --ignore-scripts
+      - name: Print dependency lock for review
+        run: cat server/package-lock.json
+      - name: Unit and real HTTP protocol tests (simulated Stripe)
+        run: npm --prefix server test
+      - name: PostgreSQL transaction and concurrency tests (simulated Stripe)
+        env:
+          BILLING_DATABASE_URL: postgresql://postgres:isolated_test_only@127.0.0.1:5432/chatdrobe_test
+        run: node --test server/integration/*.test.mjs
