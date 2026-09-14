@@ -65,7 +65,16 @@ test('a clean hosted-like build writes and verifies all deployment artifacts', t
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Verified deployable output at/);
   assert.equal(verifyBuildOutput(path.join(dir, 'dist')), 7);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'dist/build-manifest.json'))).routes.length, 25);
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'dist/build-manifest.json')));
+  const themes = JSON.parse(fs.readFileSync(path.join(dir, 'src/themes.json')));
+  const staticRoutes = ['/', '/themes/', '/install/', '/how-it-works/', '/help/', '/privacy/',
+    '/architecture/', '/changelog/', '/features/', '/premium/', '/pricing/', '/go-to-market/', '/beta-use/'];
+  const expected = [...staticRoutes, ...themes.map(theme => `/themes/${theme.id}/`)];
+  assert.deepEqual([...manifest.routes].sort(), expected.sort());
+  for (const route of expected) {
+    const file = path.join(dir, 'dist', route === '/' ? 'index.html' : route.slice(1) + 'index.html');
+    assert.ok(fs.statSync(file).isFile() && fs.statSync(file).size > 0, route);
+  }
   assert.match(fs.readFileSync(path.join(dir, 'dist/robots.txt'), 'utf8'), /Disallow: \//);
 });
 
