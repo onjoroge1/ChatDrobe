@@ -28,10 +28,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install server-only database driver
-        run: npm --prefix server install --ignore-scripts
-      - name: Print dependency lock for review
-        run: cat server/package-lock.json
+      - name: Install locked server-only database driver
+        run: npm --prefix server ci --ignore-scripts
       - name: Unit and real HTTP protocol tests (simulated Stripe)
         run: npm --prefix server test
       - name: PostgreSQL transaction and concurrency tests (simulated Stripe)
