@@ -22,12 +22,24 @@ test('Vercel repository-root invocation resolves the declared dist output', () =
   assert.equal(config.framework, null);
 });
 
-test('Vercel nested npm invocation fails with actionable settings before writing', t => {
+test('Vercel nested npm invocation emits output under the configured project root', t => {
   const dir = fixture(t);
+  const nestedRoot = path.join(dir, 'tests');
+  const context = buildContext(dir, {
+    cwd: dir, env: {VERCEL: '1', INIT_CWD: nestedRoot}
+  });
+  assert.equal(context.root, dir);
+  assert.equal(context.invocationDirectory, nestedRoot);
+  assert.equal(context.output, path.join(nestedRoot, 'dist'));
+});
+
+test('Vercel invocation outside the package root is rejected', t => {
+  const dir = fixture(t);
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'chatdrobe-outside-'));
+  t.after(() => fs.rmSync(outside, {recursive: true, force: true}));
   assert.throws(() => buildContext(dir, {
-    cwd: dir, env: {VERCEL: '1', INIT_CWD: path.join(dir, 'tests')}
-  }), /Root Directory.*Framework Preset.*Output Directory/);
-  assert.equal(fs.existsSync(path.join(dir, 'dist')), false);
+    cwd: dir, env: {VERCEL: '1', INIT_CWD: outside}
+  }), /must be the repository root or a directory inside it/);
 });
 
 test('local direct invocation stays anchored to the source root', t => {
