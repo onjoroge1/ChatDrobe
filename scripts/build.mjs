@@ -9,7 +9,7 @@ const context=buildContext(path.dirname(path.dirname(fileURLToPath(import.meta.u
 const {root,output}=context;
 console.log(`[build] Node ${process.version}; source=${root}; cwd=${context.workingDirectory}; invokedFrom=${context.invocationDirectory}; output=${output}`);
 const read=p=>JSON.parse(fs.readFileSync(path.join(root,p),'utf8'));
-const config=read('site.config.json'),themes=read('src/themes.json'),art=read('src/art.json');
+const config=read('site.config.json'),themes=read('src/themes.json'),art={...read('src/art.json'),...read('src/explorer-art.json')};
 fs.rmSync(output,{recursive:true,force:true});fs.mkdirSync(path.join(output,'assets'),{recursive:true});
 function write(file,value){const p=path.join(output,file);fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,value);}
 for(const[id,svg]of Object.entries(art))write('assets/'+id+'.svg',svg);

@@ -6,15 +6,28 @@ export function buildContext(sourceRoot, {cwd = process.cwd(), env = process.env
   const root = fs.realpathSync(sourceRoot);
   const workingDirectory = fs.realpathSync(cwd);
   const invocationDirectory = fs.realpathSync(env.INIT_CWD || cwd);
-  const output = path.join(root, 'dist');
+  let output = path.join(root, 'dist');
+
   if (['1', 'true'].includes(env.VERCEL) && invocationDirectory !== root) {
-    throw new Error(
-      `ChatDrobe was launched from ${invocationDirectory}, but its package is at ${root}. ` +
-      'Set Vercel Root Directory to the repository root (leave the field empty), ' +
-      'Framework Preset to Other, and Output Directory to dist. ' +
-      'npm can find a parent package.json while Vercel looks for output in the selected subdirectory.'
-    );
+    const relativeInvocation = path.relative(root, invocationDirectory);
+    const isNestedProjectRoot = relativeInvocation &&
+      !relativeInvocation.startsWith(`..${path.sep}`) &&
+      relativeInvocation !== '..' &&
+      !path.isAbsolute(relativeInvocation);
+
+    if (!isNestedProjectRoot) {
+      throw new Error(
+        `ChatDrobe was launched from ${invocationDirectory}, but its package is at ${root}. ` +
+        'The Vercel invocation directory must be the repository root or a directory inside it.'
+      );
+    }
+
+    // Vercel resolves Output Directory relative to its configured Root Directory.
+    // npm can still discover this package.json from a nested Root Directory, so emit
+    // deployable files under that invocation directory instead of failing the build.
+    output = path.join(invocationDirectory, 'dist');
   }
+
   return {root, workingDirectory, invocationDirectory, output};
 }
 
