@@ -1,45 +1,36 @@
 # ChatDrobe website
 
-The companion website for ChatDrobe, migrated from the 0.2.0 prototype. **Website-only repository:** it never rebuilds or modifies the extension being tested separately. Theme IDs, palettes, original SVG artwork and appearance format are preserved from that prototype.
+Static companion website for the ChatDrobe desktop Chrome extension.
 
-## Develop
+ChatDrobe is positioned as a personal workspace layer for ChatGPT: original visual worlds, reading controls and local productivity tools, with optional premium Living World routines.
 
-Node.js 22 or newer. There are no runtime or build dependencies.
+## Product routes
 
-```sh
-npm run dev       # build, then http://127.0.0.1:4173
-npm run check     # build plus Node tests
-npm run build     # output: dist/
+- `/` — product landing page
+- `/themes/` — complete world catalog
+- `/features/` — Free and Plus feature overview
+- `/premium/` — Plus-preview worlds and Living World routines
+- `/pricing/` — proposed Free vs Plus comparison
+- `/how-it-works/` — extension behavior and local-tool model
+- `/install/` — private beta install instructions
+- `/go-to-market/` — internal launch-positioning page for beta review
+
+The current Explorer collection contains 15 worlds: 11 proposed Free worlds and four Plus-preview worlds, with light/dark palette support.
+
+## Commercial boundary
+
+The private beta does not collect payment. Pricing is proposed only. Hosted checkout, server-verified entitlements, cancellation/billing management and final paid-service disclosures remain separate launch work tracked in Issue #6.
+
+## Development
+
+```bash
+npm run build
+npm test
+npm run check
 ```
 
-Run the build again after source changes; the preview server does not watch files.
+The site builds into `dist/`. Vercel should use the repository root, Framework Preset `Other`, and Output Directory `dist`; the build also tolerates a nested Vercel invocation directory by emitting `dist` where Vercel expects it.
 
-## Structure
+## Privacy and product boundaries
 
-- `src/themes.json`: shared website catalog, preserving extension 0.2.0 identifiers.
-- `src/art.json`: original SVG illustrations from the prototype; no franchise assets.
-- `src/render.mjs`: pre-rendered pages and reusable layout.
-- `src/styles.css`, `src/client.js`: small, first-party browser assets.
-- `scripts/`: dependency-free build and local server.
-- `site.config.json`: public release configuration, not secrets.
-- `dist/`: generated output; intentionally not committed.
-
-## Release boundaries
-
-The private beta package is shared with testers independently. No public ZIP or Chrome Web Store URL is invented. Installation instructions remain useful with the ZIP already provided. Appearance JSON downloads are real and do not install an extension.
-
-All 12 worlds are unlocked. Free/Plus pricing describes proposed packaging; no checkout, paid entitlements, cloud sync or live ChatGPT compatibility certification is implied. No personal information or fabricated support email is collected.
-
-## Hosting
-
-Import this repository into Vercel with framework **Other**, root directory `.`, build `npm run build`, output `dist`. `vercel.json` supplies these settings. Preview builds are noindex by default. Connecting and deploying the project is a separate authorized action; the presence of this configuration is not a deployment.
-
-## Source ownership
-
-Original ChatDrobe theme artwork and website source. No open-source license is granted by this repository. ChatDrobe is independent of OpenAI; ChatGPT is OpenAI's trademark. Brand/domain clearance remains a launch gate.
-
-## Website completion and release checks
-
-The full site contains 22 routes plus a 404 page, original world previews, filters and local favorites, a safe reading-settings showroom, real appearance downloads/imports and shareable looks. It remains a private-beta companion, not a paid-service backend.
-
-See [release and stack instructions](docs/RELEASE.md) and the [validation record](docs/VALIDATION.md). `Website quality` CI builds the site, validates content/security contracts and runs an HTTP Chromium suite. Set `SITE_URL` only after choosing an approved origin; indexing additionally requires `SITE_INDEXABLE=true` and `VERCEL_ENV=production`. No checkout or public extension link is fabricated when configuration is absent.
+The website is independent of the extension runtime. Appearance downloads contain display preferences only. The current website remains noindex by default until public launch readiness, brand/domain clearance, release URLs and commercial controls are explicitly configured.
