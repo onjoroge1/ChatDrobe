@@ -45,6 +45,7 @@ export function deploymentRoutes(manifest, config) {
     throw new Error('A new header rule must be added to the deployment route compiler explicitly.');
   const globalHeaders = Object.fromEntries((config.headers?.find(rule=>rule.source==='/(.*)')?.headers || []).map(h=>[h.key,h.value]));
   const apiHeaders = Object.fromEntries((config.headers?.find(rule=>rule.source==='/api/(.*)')?.headers || []).map(h=>[h.key,h.value]));
+  if (!Object.keys(globalHeaders).length) throw new Error('A static response-header policy is required.');
   const routes = [
     // Exact internal route: do not redirect webhook POSTs or discard their query/body.
     {src:'^/api/billing/?$', dest:'/api/billing', headers:{...apiHeaders,...NO_CACHE}},
@@ -75,7 +76,10 @@ export function buildVercelOutput(sourceRoot, options = {}) {
     throw new Error('The Vercel build directory must be a real directory.');
   verifyBuildOutput(context.output);
   const manifest=readJson(path.join(context.output,'build-manifest.json'));
-  const config=readJson(path.join(context.root,'vercel.json'));
+  const projectConfig=readJson(path.join(context.root,'vercel.json'));
+  for (const key of ['headers','trailingSlash','cleanUrls','routes','rewrites','redirects'])
+    if (Object.hasOwn(projectConfig,key)) throw new Error('Routing is compiled by Build Output API only; update its shared policy instead.');
+  const config=readJson(path.join(context.root,'src/deployment-headers.json'));
   const routes=deploymentRoutes(manifest,config);
   const lock=readJson(path.join(context.root,'server/package-lock.json'));
   if (!lock.packages?.['node_modules/pg']) throw new Error('Missing locked PostgreSQL runtime.');

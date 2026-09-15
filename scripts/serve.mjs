@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
 const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.txt':'text/plain; charset=utf-8','.xml':'application/xml; charset=utf-8','.png':'image/png','.zip':'application/zip'};
 const port=Number(process.env.PORT||4173);
-const config=JSON.parse(fs.readFileSync(path.resolve(root,'../vercel.json'),'utf8'));
+const config=JSON.parse(fs.readFileSync(path.resolve(root,'../src/deployment-headers.json'),'utf8'));
 const security=Object.fromEntries(config.headers[0].headers.map(h=>[h.key,h.value]));
 http.createServer((req,res)=>{
  if(!['GET','HEAD'].includes(req.method)){res.writeHead(405,{'Allow':'GET, HEAD'});return res.end();}
