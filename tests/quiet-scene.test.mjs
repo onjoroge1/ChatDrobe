@@ -17,9 +17,12 @@ test('quiet modules and styling remain lazy first-party assets within explicit i
  assert.match(fs.readFileSync('dist/assets/living-runtime.css','utf8'),/^@import url\('\.\/living-quiet.css'\);/);
  for(const route of JSON.parse(fs.readFileSync('dist/build-manifest.json')).routes){const html=fs.readFileSync(route==='/'?'dist/index.html':`dist${route}index.html`,'utf8');assert.doesNotMatch(html,/src="[^\"]*living-quiet|rel="stylesheet" href="[^\"]*living-quiet/);}
 });
-test('the refinement removes internal captions and keeps the base renderer source unchanged',()=>{
+test('the refinement removes internal captions and never reads form or transcript contents',()=>{
  const source=fs.readFileSync('src/living-runtime/quiet-scene.mjs','utf8');
  assert.match(source,/querySelector\('\.caption'\)\?\.remove/);
  assert.match(source,/s\.busy\|\|s\.streaming/);
- assert.doesNotMatch(source,/setInterval|localStorage|textContent|\.value\b/);
+ // Property access is forbidden; object spread (...value) is not an input.value read.
+ assert.doesNotMatch(source,/setInterval|localStorage|textContent|(?<!\.)\.\s*value\b/);
+ assert.match('input.value',/(?<!\.)\.\s*value\b/);
+ assert.doesNotMatch('...value',/(?<!\.)\.\s*value\b/);
 });
