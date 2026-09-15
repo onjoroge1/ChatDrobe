@@ -15,8 +15,9 @@ const config=read('site.config.json'),themes=read('src/themes.json'),art={...rea
 fs.rmSync(output,{recursive:true,force:true});fs.mkdirSync(path.join(output,'assets'),{recursive:true});
 function write(file,value){const p=path.join(output,file);fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,value);}
 for(const[id,svg]of Object.entries(art))write('assets/'+id+'.svg',svg);
-for(const file of ['styles.css','client.js','preferences.js','catalog.js','showroom.js','experience.css','living-worlds.js'])fs.copyFileSync(path.join(root,'src',file),path.join(output,'assets',file));
-fs.appendFileSync(path.join(output,'assets','styles.css'),'\n'+fs.readFileSync(path.join(root,'src','marketing.css'),'utf8')+'\n'+fs.readFileSync(path.join(root,'src','living-worlds.css'),'utf8'));
+for(const file of ['styles.css','client.js','preferences.js','catalog.js','showroom.js','experience.css','living-worlds.js','living-worlds.css'])fs.copyFileSync(path.join(root,'src',file),path.join(output,'assets',file));
+// The showcase is optional: its scene CSS must not be paid for on every other page.
+fs.appendFileSync(path.join(output,'assets','styles.css'),'\n'+fs.readFileSync(path.join(root,'src','marketing.css'),'utf8'));
 const colors={bg:'bg',surface:'surface',panel:'panel',ink:'text',muted:'muted',accent:'accent',soft:'soft',line:'line'};
 write('assets/worlds.css',themes.map(t=>`[data-theme="${t.id}"]{${Object.entries(colors).map(([key,col])=>`--world-${key}:${t[col]}`).join(';')}}.swatch[data-theme="${t.id}"]{background:${t.accent}}`+['bg','surface','accent','text'].map(k=>`.palette-${t.id}-${k}{background:${t[k]}}`).join('')).join('\n')+'\n.unthemed{--world-bg:#fff!important;--world-surface:#fff!important;--world-panel:#f4f4f4!important;--world-ink:#262626!important;--world-muted:#606060!important;--world-soft:#eee!important;--world-accent:#464646!important;--world-line:#ddd!important}\n');
 const routes=[];
@@ -24,6 +25,7 @@ function page(route,title,body,summary,scripts=[]){
   routes.push(route);
   let raw=layout({title,summary,path:route,body,config,scripts});
   raw=raw.replace('<a href="/pricing/">Pricing</a>','<a href="/pricing/">Pricing</a><a href="/living-worlds/">Living Worlds</a>');
+  if(route==='/living-worlds/')raw=raw.replace('</head>','<link rel="stylesheet" href="/assets/living-worlds.css"></head>');
   write(route==='/'?'index.html':route.slice(1)+'index.html',enhance(upgradeLegacyCopy(raw,themes),route,themes));
 }
 page('/','Personal themes for your ChatGPT workspace',injectHome(home(themes,config),themes),'Personalize ChatGPT with original visual worlds, reading controls, local workspace tools and optional premium Living World scenes.');
