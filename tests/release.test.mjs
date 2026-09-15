@@ -14,9 +14,13 @@ test('core budgets stay bounded and additional scene code is a separate on-deman
  const files=fs.readdirSync('dist/assets');
  const coreJs=files.filter(f=>f.endsWith('.js')&&!f.startsWith('living-')).reduce((sum,f)=>sum+bytes(f),0);
  assert.ok(coreJs<15000,`Core scripts: ${coreJs}`);assert.ok(bytes('client.js')<5000);
- assert.ok(bytes('living-worlds.js')+bytes('living-tour.js')<11000,'Preview controls exceed 11 KB');
- assert.ok(bytes('living-model.js')+bytes('living-renderer.js')<18000,'Lazy renderer exceeds 18 KB');
- assert.ok(bytes('living-runtime.css')<7000,'Lazy Shadow DOM CSS exceeds 7 KB');
+ // Four explicit companion demonstrations add UI text/control handling only on preview pages.
+ const controls=bytes('living-worlds.js')+bytes('living-tour.js');
+ assert.ok(controls<12000,`Preview controls exceed the revised 12 KB cap: ${controls}`);
+ assert.ok(bytes('living-model.js')+bytes('living-renderer.js')<18000,'Lazy base renderer exceeds 18 KB');
+ assert.ok(bytes('living-quiet.js')<3500,'Lazy quiet refinement exceeds 3.5 KB');
+ assert.ok(bytes('living-quiet.css')<4000,'Lazy quiet CSS exceeds 4 KB');
+ assert.ok(bytes('living-runtime.css')<7000,'Lazy base CSS exceeds 7 KB');
  const coreCss=files.filter(f=>f.endsWith('.css')&&!f.startsWith('living-')).reduce((sum,f)=>sum+bytes(f),0);
  assert.ok(coreCss<24000,`Core CSS: ${coreCss}`);assert.ok(bytes('living-worlds.css')<8000);
  const illustrated=new Set(['/','/themes/','/features/','/premium/','/living-worlds/']);
@@ -26,7 +30,7 @@ test('core budgets stay bounded and additional scene code is a separate on-deman
   const styles=[...html.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g)].map(m=>m[1]);
   assert.equal(styles.includes('/assets/living-worlds.css'),illustrated.has(route),route);
   assert.equal(html.includes('src="/assets/living-worlds.js"'),interactive.has(route),route);
-  for(const deferred of ['living-renderer.js','living-model.js','living-runtime.css'])assert.ok(!html.includes(deferred),route+' eagerly loads '+deferred);
+  for(const deferred of ['living-renderer.js','living-model.js','living-runtime.css','living-quiet.js','living-quiet.css'])assert.ok(!html.includes(deferred),route+' eagerly loads '+deferred);
   const css=styles.reduce((sum,url)=>sum+fs.statSync('dist'+url).size,0);
   assert.ok(css<(illustrated.has(route)?32000:24000),`Per-route CSS: ${route} (${css})`);
  }
