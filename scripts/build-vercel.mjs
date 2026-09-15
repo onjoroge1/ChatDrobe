@@ -1,0 +1,123 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+import {fileURLToPath, pathToFileURL} from 'node:url';
+import {buildContext, verifyBuildOutput} from './build-contract.mjs';
+
+const RUNTIME_FILES = Object.freeze([
+  'api/billing.js', 'server/security.mjs', 'server/http.mjs',
+  'server/billing-service.mjs', 'server/stripe-client.mjs', 'server/pg-store.mjs'
+]);
+const STATIC_EXTENSIONS = new Set(['.html','.css','.js','.json','.svg','.txt','.xml','.png','.jpg','.jpeg','.webp','.ico']);
+const PRIVATE_NAMES = /(^\.|\.(?:pem|key|env)$|^id_rsa$)/i;
+const NO_CACHE = {'Cache-Control':'no-store, private','Vercel-CDN-Cache-Control':'no-store','CDN-Cache-Control':'no-store'};
+const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+const writeJson = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
+
+function copyFiles(source, destination, {staticFiles = false, skipHidden = false} = {}) {
+  let files = 0, bytes = 0;
+  function visit(from, to) {
+    const stat = fs.lstatSync(from);
+    if (stat.isSymbolicLink()) throw new Error('Build output cannot include symlinks.');
+    if (stat.isDirectory()) {
+      fs.mkdirSync(to, {recursive:true});
+      for (const name of fs.readdirSync(from)) {
+        if (PRIVATE_NAMES.test(name)) {
+          if (skipHidden) continue;
+          throw new Error('Private/hidden files are not permitted in deployment input.');
+        }
+        visit(path.join(from,name), path.join(to,name));
+      }
+    } else if (stat.isFile()) {
+      if (staticFiles && !STATIC_EXTENSIONS.has(path.extname(from))) throw new Error('Unexpected static asset type.');
+      files++; bytes += stat.size;
+      if (files > 5000 || bytes > 10 * 1024 * 1024) throw new Error('Deployment input exceeds its bounded file budget.');
+      fs.mkdirSync(path.dirname(to), {recursive:true}); fs.copyFileSync(from,to);
+    } else throw new Error('Unsupported deployment input.');
+  }
+  visit(source,destination); return {files,bytes};
+}
+
+export function deploymentRoutes(manifest, config) {
+  if (!Array.isArray(manifest.routes) || !manifest.routes.includes('/') || new Set(manifest.routes).size !== manifest.routes.length)
+    throw new Error('A complete unique route manifest is required.');
+  if (config.headers?.some(rule => !['/(.*)','/api/(.*)'].includes(rule.source)))
+    throw new Error('A new header rule must be added to the deployment route compiler explicitly.');
+  const globalHeaders = Object.fromEntries((config.headers?.find(rule=>rule.source==='/(.*)')?.headers || []).map(h=>[h.key,h.value]));
+  const apiHeaders = Object.fromEntries((config.headers?.find(rule=>rule.source==='/api/(.*)')?.headers || []).map(h=>[h.key,h.value]));
+  const routes = [
+    // Exact internal route: do not redirect webhook POSTs or discard their query/body.
+    {src:'^/api/billing/?$', dest:'/api/billing', headers:{...apiHeaders,...NO_CACHE}},
+    {src:'^/.*$', headers:globalHeaders, continue:true}
+  ];
+  for (const route of manifest.routes) {
+    if (!/^\/(?:[a-z0-9-]+\/)*$/.test(route) || route.startsWith('/api/')) throw new Error('Unsupported static route.');
+    if (route === '/') routes.push({src:'^/$',dest:'/index.html'});
+    else {
+      const stem=route.slice(0,-1);
+      routes.push({src:'^'+stem+'$',methods:['GET','HEAD'],status:308,headers:{Location:route}});
+      routes.push({src:'^'+route+'$',dest:route+'index.html'});
+    }
+  }
+  routes.push({handle:'filesystem'}, {src:'^/.*$',dest:'/404.html',status:404});
+  return routes;
+}
+
+/** Emit both static and executable artifacts where the Vercel build actually runs.
+ * Uses Build Output API v3; never copies the repository wholesale or reads runtime secrets.
+ */
+export function buildVercelOutput(sourceRoot, options = {}) {
+  const context = buildContext(sourceRoot,options);
+  const env=options.env || process.env;
+  const deployRoot=['1','true'].includes(env.VERCEL) ? context.invocationDirectory : context.root;
+  const vercelDirectory=path.join(deployRoot,'.vercel');
+  if (fs.existsSync(vercelDirectory) && (!fs.lstatSync(vercelDirectory).isDirectory() || fs.lstatSync(vercelDirectory).isSymbolicLink()))
+    throw new Error('The Vercel build directory must be a real directory.');
+  verifyBuildOutput(context.output);
+  const manifest=readJson(path.join(context.output,'build-manifest.json'));
+  const config=readJson(path.join(context.root,'vercel.json'));
+  const routes=deploymentRoutes(manifest,config);
+  const lock=readJson(path.join(context.root,'server/package-lock.json'));
+  if (!lock.packages?.['node_modules/pg']) throw new Error('Missing locked PostgreSQL runtime.');
+  fs.mkdirSync(vercelDirectory,{recursive:true});
+  const temporary=fs.mkdtempSync(path.join(vercelDirectory,'chatdrobe-output-'));
+  const destination=path.join(vercelDirectory,'output');
+  try {
+    for (const name of ['api','server','contracts','node_modules'])
+      if (fs.existsSync(path.join(context.output,name))) throw new Error('Server-side files must never be published as static assets.');
+    const staticSize=copyFiles(context.output,path.join(temporary,'static'),{staticFiles:true});
+    const fn=path.join(temporary,'functions/api/billing.func');
+    fs.mkdirSync(fn,{recursive:true});
+    writeJson(path.join(fn,'package.json'),{private:true,type:'module'});
+    for (const file of RUNTIME_FILES) copyFiles(path.join(context.root,file),path.join(fn,file));
+    const copiedPackages=[];
+    for (const [relative,entry] of Object.entries(lock.packages)) {
+      if (!relative) continue;
+      if (!/^node_modules\/(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/.test(relative) || !entry.integrity)
+        throw new Error('Review the changed server dependency layout before packaging.');
+      const installed=path.join(context.root,'server',relative);
+      if (!fs.existsSync(installed)) {
+        if (entry.optional) continue;
+        throw new Error('Install the locked billing dependencies before producing deployment output.');
+      }
+      if (readJson(path.join(installed,'package.json')).version !== entry.version) throw new Error('Installed server dependency differs from lockfile.');
+      copyFiles(installed,path.join(fn,relative),{skipHidden:true}); copiedPackages.push(relative);
+    }
+    writeJson(path.join(fn,'.vc-config.json'),{runtime:'nodejs22.x',handler:'api/billing.js',launcherType:'Nodejs',shouldAddHelpers:false,maxDuration:60});
+    // Verify resolution inside the isolated bundle, not against source node_modules.
+    const require=createRequire(path.join(fn,'package.json'));
+    const pg=require.resolve('pg');
+    if (!pg.startsWith(fn+path.sep) || typeof require('pg').Pool !== 'function') throw new Error('Billing function is missing its database dependency.');
+    writeJson(path.join(temporary,'config.json'),{version:3,routes});
+    if (fs.existsSync(destination) && fs.lstatSync(destination).isSymbolicLink()) throw new Error('Refusing a symlinked output destination.');
+    fs.rmSync(destination,{recursive:true,force:true}); fs.renameSync(temporary,destination);
+    return {output:destination,staticRoutes:manifest.routes.length,staticFiles:staticSize.files,functions:['/api/billing'],runtimePackages:copiedPackages.length};
+  } catch (error) {fs.rmSync(temporary,{recursive:true,force:true});throw error;}
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  const result=buildVercelOutput(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
+  console.log(`[deploy] Build Output API v3 at ${result.output}`);
+  console.log(`[deploy] ${result.staticRoutes} page routes; billing function /api/billing (nodejs22.x); ${result.runtimePackages} locked runtime packages`);
+  console.log('[deploy] No billing credentials, database migrations, or payment-mode changes were performed.');
+}
