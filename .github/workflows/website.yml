@@ -28,6 +28,8 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: HTTP browser checks
         run: python tests/browser.py
+      - name: Living Worlds HTTP browser checks
+        run: python tests/living-browser.py
       - uses: actions/upload-artifact@v5
         if: always()
         with:
