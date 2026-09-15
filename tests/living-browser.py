@@ -64,9 +64,17 @@ try:
             page.get_by_role('button',name='Reset preview').click();expect(preview).to_have_attribute('data-motion','false')
             assert page.evaluate('window.cspViolations')==[],page.evaluate('window.cspViolations')
             page.get_by_role('button',name='Watch a 30-second journey',exact=True).click()
+            page.evaluate("scrollTo({top:document.body.scrollHeight,behavior:'instant'})")
+            expect(preview).to_have_attribute('data-active','false')
+            expect(preview).to_have_attribute('data-playing','true')
+            # The visibility callback settles the last visible milliseconds. Take the
+            # baseline AFTER that transition, not before scrolling while still active.
             before=page.locator('[data-env-progress]').input_value()
-            page.evaluate('scrollTo(0,document.body.scrollHeight)');expect(preview).to_have_attribute('data-active','false')
-            page.clock.fast_forward(60000);assert page.locator('[data-env-progress]').input_value()==before
+            frozen_stage=room.get_attribute('data-stage')
+            page.clock.fast_forward(60000)
+            assert page.locator('[data-env-progress]').input_value()==before
+            expect(room).to_have_attribute('data-stage',frozen_stage)
+            expect(preview).to_have_attribute('data-playing','true')
             for width in [360,390,768,1440]:
                 page.set_viewport_size({'width':width,'height':950})
                 for route in ['/','/themes/','/premium/','/pricing/','/living-worlds/']:
