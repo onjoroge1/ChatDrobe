@@ -6,6 +6,8 @@ import {enhance} from '../src/enhance.mjs';
 import {finalizeSite} from '../src/release.mjs';
 import {injectHome,upgradeLegacyCopy,featuresPage,premiumPage,pricingPage,marketingPage} from '../src/product.mjs';
 import {livingWorldsShowcase} from '../src/living-worlds.mjs';
+import {livingPreview} from '../src/living-collection.mjs';
+import {writeLivingAssets} from './living-assets.mjs';
 import {buildContext,verifyBuildOutput} from './build-contract.mjs';
 const context=buildContext(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const {root,output}=context;
@@ -16,12 +18,14 @@ fs.rmSync(output,{recursive:true,force:true});fs.mkdirSync(path.join(output,'ass
 function write(file,value){const p=path.join(output,file);fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,value);}
 for(const[id,svg]of Object.entries(art))write('assets/'+id+'.svg',svg);
 for(const file of ['styles.css','client.js','preferences.js','catalog.js','showroom.js','experience.css','living-worlds.js','living-worlds.css'])fs.copyFileSync(path.join(root,'src',file),path.join(output,'assets',file));
+writeLivingAssets(root,path.join(output,'assets'));
 fs.appendFileSync(path.join(output,'assets','styles.css'),'\n'+fs.readFileSync(path.join(root,'src','marketing.css'),'utf8'));
 const colors={bg:'bg',surface:'surface',panel:'panel',ink:'text',muted:'muted',accent:'accent',soft:'soft',line:'line'};
 write('assets/worlds.css',themes.map(t=>`[data-theme="${t.id}"]{${Object.entries(colors).map(([key,col])=>`--world-${key}:${t[col]}`).join(';')}}.swatch[data-theme="${t.id}"]{background:${t.accent}}`+['bg','surface','accent','text'].map(k=>`.palette-${t.id}-${k}{background:${t[k]}}`).join('')).join('\n')+'\n.unthemed{--world-bg:#fff!important;--world-surface:#fff!important;--world-panel:#f4f4f4!important;--world-ink:#262626!important;--world-muted:#606060!important;--world-soft:#eee!important;--world-accent:#464646!important;--world-line:#ddd!important}\n');
 const routes=[];
 function page(route,title,body,summary,scripts=[]){
  routes.push(route);
+ if(route==='/premium/')body=body.replace('<div class="env-grid">',livingPreview('tokyo','premium-demo')+'<div class="env-grid">');
  const illustrated=body.includes('env-room');
  const modules=[...new Set([...scripts,...(body.includes('data-living-preview')?['living-worlds.js']:[])])];
  let raw=layout({title,summary,path:route,body,config,scripts:modules});
@@ -40,7 +44,7 @@ page('/living-worlds/','Living Worlds — Tokyo, Starship and Train',livingWorld
 page('/go-to-market/','Launch strategy',marketingPage(),'ChatDrobe launch positioning for its private beta: Living environments, original static themes and practical workspace tools.');
 write('404.html',upgradeLegacyCopy(layout({title:'This world is not here',body:documentPage('A wrong turn, not a dead end.','<p>The page could not be found. <a href="/themes/">Find a theme</a> or <a href="/">go home</a>.'),path:'/404/',config}),themes));
 const release=finalizeSite(output,config,routes);
-write('build-manifest.json',JSON.stringify({websiteVersion:'0.5.1',extensionVersion:config.extensionVersion,routes,themes:themes.length},null,2)+'\n');
+write('build-manifest.json',JSON.stringify({websiteVersion:'0.5.2',extensionVersion:config.extensionVersion,routes,themes:themes.length},null,2)+'\n');
 verifyBuildOutput(output);
 console.log(`[build] Verified deployable output at ${output}`);
 console.log(`Built ${routes.length} pages and ${themes.length} appearance files. Indexing: ${release.indexable?'enabled':'disabled'}.`);
