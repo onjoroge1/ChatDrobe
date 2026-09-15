@@ -2,11 +2,12 @@ import {createTour} from './living-tour.js';
 /* First-party demo only. No extension APIs, conversation inspection, storage or payment calls. */
 let resources;
 function loadRenderer(){
- if(!resources)resources=Promise.all([import('./living-renderer.js'),import('./living-model.js')]).catch(error=>{resources=null;throw error;});
+ if(!resources)resources=Promise.all([import('./living-quiet.js'),import('./living-model.js')]).catch(error=>{resources=null;throw error;});
  return resources;
 }
 const names={tokyo:'Rainy Tokyo Loft',starship:'Starship Journey',train:'Cozy Train Journey'};
-const eventNotes={rest:'Normal workspace. Nothing is sent or recorded.',CHAT_STARTED:'The desk lamp turns on; the spacecraft enters its active state.',USER_IDLE:'The cat closes its eyes; the spacecraft companion rests.',USER_RETURNED:'The companion wakes and the workspace returns to its active state.',FOCUS_STARTED:'Quiet Focus pauses ambient motion. Journey chapters can still advance.',FOCUS_COMPLETE:'The arrival marker celebrates a completed session. This demo awards no focus minutes.',RESPONSE_STREAMING:'The spacecraft signal lights pulse when motion is enabled. No response text is read.'};
+const poses={COMPANION_BLINK:'blink',COMPANION_GROOM:'groom',COMPANION_SCRATCH:'scratch',DRONE_INSPECT:'inspect'};
+const eventNotes={rest:'Normal workspace. Nothing is sent or recorded.',CHAT_STARTED:'The desk lamp turns on; the spacecraft enters its active state.',USER_IDLE:'The cat rests; no message content is read.',USER_RETURNED:'The companion wakes without a notification.',FOCUS_STARTED:'Quiet Focus pauses ambient motion. Journey chapters can still advance.',FOCUS_COMPLETE:'The journey reaches its destination without an overlay or reward pop-up.',RESPONSE_STREAMING:'Motion holds while an answer is being generated.',COMPANION_BLINK:'A single slow blink. The real workspace waits for inactivity.',COMPANION_GROOM:'A brief paw-grooming sequence, in place. Demo only: real actions have quiet gaps.',COMPANION_SCRATCH:'A short ear scratch, then rest. No walking across your conversation.',DRONE_INSPECT:'One quiet inspection, then back to its dock.'};
 for(const preview of document.querySelectorAll('[data-living-preview]')){
  const $=s=>preview.querySelector(s),buttons=[...preview.querySelectorAll('[data-env-select]')];
  let world=buttons.find(b=>b.getAttribute('aria-pressed')==='true')?.dataset.envSelect||'tokyo';
@@ -14,7 +15,10 @@ for(const preview of document.querySelectorAll('[data-living-preview]')){
  const reduced=matchMedia('(prefers-reduced-motion: reduce)'),events=new AbortController();
  const motion=$('[data-env-motion]'),light=$('[data-env-light]'),portal=$('[data-env-portal]');
  const play=$('[data-env-play]'),slider=$('[data-env-progress]'),weather=$('[data-env-weather]'),time=$('[data-env-time]'),moment=$('[data-env-event]');
- const host=$('[data-env-live]'),stage=$('.env-stage'),error=$('[data-env-error]');
+ const host=$('[data-env-live]'),error=$('[data-env-error]');
+ for(const [value,label]of [['COMPANION_BLINK','Preview cat — slow blink'],['COMPANION_GROOM','Preview cat — groom paw'],['COMPANION_SCRATCH','Preview cat — scratch ear'],['DRONE_INSPECT','Preview drone — inspect']]){const option=document.createElement('option');option.value=value;option.textContent=label;moment.append(option);}
+ $('[data-env-badge]').hidden=true;
+ $('.env-demo-note').textContent='A compressed website demo, with the quieter companion refinement from private build v0.5.2. Demo controls stay here; the extension adds no labels or counters over your chat.';
  const tour=createTour({onChange:()=>paint()});
  const canRun=()=>visible&&!document.hidden&&document.hasFocus()&&!reduced.matches;
  const listen=(target,name,fn)=>target.addEventListener(name,fn,{signal:events.signal});
@@ -24,6 +28,7 @@ for(const preview of document.querySelectorAll('[data-living-preview]')){
   const d=definition();weather.replaceChildren(...d.weather.map(id=>{const o=document.createElement('option');o.value=id;o.textContent=id[0].toUpperCase()+id.slice(1);return o;}));
   weather.value=d.defaultWeather;
   moment.querySelector('[value="RESPONSE_STREAMING"]').disabled=!d.rules.RESPONSE_STREAMING;
+  for(const key of Object.keys(poses))moment.querySelector(`[value="${key}"]`).disabled=(key==='DRONE_INSPECT')!==(world==='starship');
  }
  async function ready(){
   if(renderer)return;
@@ -65,9 +70,8 @@ for(const preview of document.querySelectorAll('[data-living-preview]')){
    if(sceneWorld!==world){const next=renderer.createScene(document,d);scene?.element.remove();scene=next;sceneWorld=world;host.shadowRoot.append(scene.element);}
    const behavior=moment.value==='rest'?model.state():model.react(d,model.state(),moment.value);
    const arrived=behavior.arrived||snap.complete;
-   scene.update({...behavior,arrived,light:day,weather:weather.value,stage:snap.stage,label:chapter,motion:moving,active:canRun(),quiet:true});
+   scene.update({...behavior,pose:poses[moment.value]||'rest',arrived,light:day,weather:weather.value,stage:snap.stage,label:chapter,motion:moving,active:canRun(),quiet:true});
    host.hidden=false;preview.dataset.ready='true';
-   text($('[data-env-badge]'),arrived?'Session complete · '+chapter:chapter);
    text($('[data-env-chapter]'),`${snap.stage+1} / ${d.stages.length} · ${chapter}`);
    slider.value=String(Math.round(snap.progress*100));slider.setAttribute('aria-valuetext',chapter);
   }
@@ -87,7 +91,8 @@ for(const preview of document.querySelectorAll('[data-living-preview]')){
  listen(weather,'change',()=>{const selected=weather.value;use(()=>{weather.value=definition().weather.includes(selected)?selected:definition().defaultWeather;});});
  listen(time,'change',()=>use(()=>{}));
  listen(moment,'change',()=>use(()=>{
-  if(moment.value==='RESPONSE_STREAMING'&&!definition().rules.RESPONSE_STREAMING)moment.value='rest';
+  if(moment.querySelector(`[value="${moment.value}"]`)?.disabled)moment.value='rest';
+  if(Object.hasOwn(poses,moment.value)&&!reduced.matches){requested=true;tour.pause();}
   if(moment.value==='FOCUS_COMPLETE'){tour.pause();tour.seek(1);}
  }));
  listen(light,'click',()=>use(()=>{time.value=preview.dataset.day==='night'?'day':'night';}));
