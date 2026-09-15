@@ -34,7 +34,9 @@ try:
         expect(room).to_have_attribute('data-motion','false')
         expect(room).to_have_attribute('data-pose','rest')
         page.get_by_role('button',name='Starship Journey',exact=True).click()
-        expect(page.locator('[value="COMPANION_GROOM"]')).to_be_disabled()
+        # A disabled <option> is not a disabled <select>. Check the native option
+        # property directly instead of the generic control-actionability matcher.
+        expect(page.locator('[value="COMPANION_GROOM"]')).to_have_js_property('disabled',True)
         page.get_by_label('Session moment').select_option('DRONE_INSPECT')
         expect(room).to_have_attribute('data-pose','inspect')
         assert room.locator('.drone').evaluate('(n)=>getComputedStyle(n).animationName')=='quiet-inspect'
