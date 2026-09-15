@@ -25,4 +25,4 @@ test('core assets retain their budget and showcase CSS loads only on the showcas
   assert.ok(bytes<(route==='/living-worlds/'?36000:24000),`Per-route CSS budget: ${route} (${bytes})`);
  }
 });
-test('security headers prohibit remote scripts and framing without blocking style controls',()=>{const headers=JSON.parse(fs.readFileSync('vercel.json')).headers[0].headers;const csp=headers.find(h=>h.key==='Content-Security-Policy').value;assert.match(csp,/script-src 'self'/);assert.match(csp,/frame-ancestors 'none'/);assert.match(csp,/style-src-attr 'unsafe-inline'/);assert.ok(!csp.includes("script-src 'self' 'unsafe-inline'"));});
+test('security headers prohibit remote scripts and framing without blocking style controls',()=>{const headers=JSON.parse(fs.readFileSync('src/deployment-headers.json')).headers[0].headers;const csp=headers.find(h=>h.key==='Content-Security-Policy').value;assert.match(csp,/script-src 'self'/);assert.match(csp,/frame-ancestors 'none'/);assert.match(csp,/style-src-attr 'unsafe-inline'/);assert.ok(!csp.includes("script-src 'self' 'unsafe-inline'"));});
