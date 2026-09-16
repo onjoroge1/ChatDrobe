@@ -1,0 +1,3 @@
+/** Public shells contain no user records. Only these routes may call same-origin APIs. */
+export const ACCOUNT_PATH=/^\/(signup|signin|account|admin)(?:\/index\.html|\/)?$/;
+export function accountHeaders(globalHeaders){const csp=globalHeaders['Content-Security-Policy'];if(typeof csp!=='string'||!csp.includes("connect-src 'none'"))throw new Error('Review the account CSP change.');return {...globalHeaders,'Content-Security-Policy':csp.replace("connect-src 'none'","connect-src 'self'"),'Cache-Control':'no-store, private','Vercel-CDN-Cache-Control':'no-store','CDN-Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Robots-Tag':'noindex, nofollow'};}
