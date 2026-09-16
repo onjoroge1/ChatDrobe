@@ -1,4 +1,5 @@
 import {createHash, createHmac, createPrivateKey, createPublicKey, sign, timingSafeEqual, randomUUID} from 'node:crypto';
+import {databaseUrl as resolveDatabaseUrl} from './database-config.mjs';
 
 export class BillingError extends Error {
   constructor(code, message, status = 400) { super(message); this.code = code; this.status = status; }
@@ -17,7 +18,7 @@ export function configuration(env = process.env) {
   if (!/^sk_test_[a-zA-Z0-9]+$/.test(env.STRIPE_SECRET_KEY || '')) throw new BillingError('CONFIGURATION', 'A Stripe test secret is required.', 503);
   if (!/^whsec_[a-zA-Z0-9]+$/.test(env.STRIPE_WEBHOOK_SECRET || '')) throw new BillingError('CONFIGURATION', 'A webhook signing secret is required.', 503);
   if (!/^price_[a-zA-Z0-9]+$/.test(env.STRIPE_PLUS_PRICE_ID || '')) throw new BillingError('CONFIGURATION', 'A test recurring Price ID is required.', 503);
-  let origin, privateKey;
+  let origin, privateKey, databaseUrl;
   try {
     const u = new URL(env.BILLING_ORIGIN);
     const local = !env.VERCEL && env.BILLING_ALLOW_LOCALHOST === 'true' && ['localhost', '127.0.0.1'].includes(u.hostname);
@@ -25,14 +26,14 @@ export function configuration(env = process.env) {
     origin = u.origin;
     privateKey = createPrivateKey((env.BILLING_SIGNING_PRIVATE_KEY || '').replaceAll('\\n', '\n'));
     if (privateKey.asymmetricKeyType !== 'ec' || privateKey.asymmetricKeyDetails.namedCurve !== 'prime256v1') throw Error();
-    if (!/^postgres(ql)?:\/\//.test(env.BILLING_DATABASE_URL || '')) throw Error();
+    databaseUrl = resolveDatabaseUrl(env);
   } catch { throw new BillingError('CONFIGURATION', 'Billing origin, database or P-256 signing key is not configured correctly.', 503); }
   const extensionIds = (env.BILLING_EXTENSION_IDS || '').split(',').filter(Boolean);
   if (!extensionIds.length || extensionIds.some(id => !/^[a-p]{32}$/.test(id))) throw new BillingError('CONFIGURATION', 'Allowlist the test extension ID before enabling billing.', 503);
   const publicJwk = createPublicKey(privateKey).export({format: 'jwk'});
   return {enabled: true, mode: 'test', origin, privateKey, publicJwk, keyId: hash(JSON.stringify(publicJwk)).slice(0, 16),
     stripeSecret: env.STRIPE_SECRET_KEY, webhookSecret: env.STRIPE_WEBHOOK_SECRET, priceId: env.STRIPE_PLUS_PRICE_ID,
-    databaseUrl: env.BILLING_DATABASE_URL, extensionIds, expectedAmount: 2900, expectedCurrency: 'usd'};
+    databaseUrl, extensionIds, expectedAmount: 2900, expectedCurrency: 'usd'};
 }
 
 export function installationId(authorization) {

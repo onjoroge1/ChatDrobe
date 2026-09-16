@@ -7,12 +7,15 @@
   "engines": {"node": "22.x"},
   "scripts": {
     "build": "node scripts/build.mjs",
-    "build:vercel": "node scripts/build.mjs && node scripts/build-vercel.mjs",
+    "build:vercel": "node scripts/build.mjs && node scripts/build-vercel.mjs && npm run db:deploy",
     "dev": "node scripts/build.mjs && node scripts/serve.mjs",
     "preview": "node scripts/serve.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "npm run build && npm test",
     "install:billing": "npm --prefix server ci --ignore-scripts",
-    "test:billing": "npm --prefix server test"
+    "test:billing": "npm --prefix server test",
+    "db:migrate": "node server/migrate.mjs",
+    "db:status": "node server/database-status.mjs",
+    "db:deploy": "node server/deploy-database.mjs"
   }
 }
