@@ -10,7 +10,7 @@ async function rawBody(req, max) {
 }
 function json(res, status, value) { res.statusCode = status; res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.end(JSON.stringify(value)); }
 
-export function createHandler(dependencies) {
+export function createHandler(dependencies,{databaseStatus}={}) {
   return async function handler(req, res) {
     const requestId = randomUUID();
     res.setHeader('Cache-Control', 'no-store, private');
@@ -23,6 +23,11 @@ export function createHandler(dependencies) {
     res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     try {
       const action = new URL(req.url, 'https://billing.invalid').searchParams.get('action');
+      if (action === 'database') {
+        if (req.method !== 'GET') throw new BillingError('METHOD', 'Database readiness is read-only; use GET.', 405);
+        const status=databaseStatus?await databaseStatus():{configured:false,connected:false,schemaReady:false,status:'not_configured'};
+        json(res,status.schemaReady?200:503,status);return;
+      }
       if (action === 'return' && req.method === 'GET') {
         // Pure informational page: no credentials, session IDs or URL flags can grant a license.
         res.statusCode = 200; res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -48,7 +53,6 @@ export function createHandler(dependencies) {
       }
       if (!['checkout','entitlement','portal'].includes(action)) throw new BillingError('NOT_FOUND', 'Unknown billing action.', 404);
       const id = installationId(req.headers.authorization);
-      // Durable global cap prevents unbounded state creation by rotating installation secrets.
       await store.limit('api-global', 600, 60, clock());
       await store.limit('api:' + id, 30, 60, clock());
       if (!(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) throw new BillingError('CONTENT_TYPE', 'Send application/json.', 415);
@@ -61,7 +65,7 @@ export function createHandler(dependencies) {
       json(res, 200, result);
     } catch (error) {
       const known = error instanceof BillingError;
-      if (!known) console.error('billing request failed', requestId); // Do not log payloads, auth headers, SQL, URLs or provider errors.
+      if (!known) console.error('billing request failed', requestId);
       json(res, known ? error.status : 503, {error: {code: known ? error.code : 'UNAVAILABLE', message: known ? error.message : 'Billing is temporarily unavailable. Please retry.', requestId}});
     }
   };

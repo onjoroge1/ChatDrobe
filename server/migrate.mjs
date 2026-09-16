@@ -1,8 +1,13 @@
-import fs from 'node:fs/promises';
+import {pathToFileURL} from 'node:url';
+import path from 'node:path';
+import {databaseUrl} from './database-config.mjs';
 import {connectStore} from './pg-store.mjs';
-if (!process.env.BILLING_DATABASE_URL) throw new Error('Set BILLING_DATABASE_URL in the environment; never pass it as a command-line argument.');
-const {pool} = await connectStore(process.env.BILLING_DATABASE_URL);
-try {
-  await pool.query(await fs.readFile(new URL('./migrations/001_billing.sql', import.meta.url), 'utf8'));
-  console.log('Billing migration 001 applied.');
-} finally { await pool.end(); }
+import {migrateDatabase} from './database-migrations.mjs';
+export async function runMigration(env=process.env) {
+  const {pool}=await connectStore(databaseUrl(env,{migration:true}));
+  try{return await migrateDatabase(pool);}finally{await pool.end();}
+}
+if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href){
+  try{const result=await runMigration();console.log(`[database] ${result.version}: ${result.applied?'applied':'already applied'}; schema ready.`);}
+  catch{console.error('[database] Migration failed. Verify server environment, database reachability and schema permissions. No credentials are printed.');process.exitCode=1;}
+}

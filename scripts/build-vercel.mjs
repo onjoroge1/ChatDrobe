@@ -6,7 +6,8 @@ import {buildContext, verifyBuildOutput} from './build-contract.mjs';
 
 const RUNTIME_FILES = Object.freeze([
   'api/billing.js', 'server/security.mjs', 'server/http.mjs',
-  'server/billing-service.mjs', 'server/stripe-client.mjs', 'server/pg-store.mjs'
+  'server/billing-service.mjs', 'server/stripe-client.mjs', 'server/pg-store.mjs',
+  'server/database-config.mjs', 'server/database-schema.mjs', 'server/database-readiness.mjs'
 ]);
 const STATIC_EXTENSIONS = new Set(['.html','.css','.js','.json','.svg','.txt','.xml','.png','.jpg','.jpeg','.webp','.ico']);
 const PRIVATE_NAMES = /(^\.|\.(?:pem|key|env)$|^id_rsa$)/i;
@@ -47,7 +48,6 @@ export function deploymentRoutes(manifest, config) {
   const apiHeaders = Object.fromEntries((config.headers?.find(rule=>rule.source==='/api/(.*)')?.headers || []).map(h=>[h.key,h.value]));
   if (!Object.keys(globalHeaders).length) throw new Error('A static response-header policy is required.');
   const routes = [
-    // Exact internal route: do not redirect webhook POSTs or discard their query/body.
     {src:'^/api/billing/?$', dest:'/api/billing', headers:{...apiHeaders,...NO_CACHE}},
     {src:'^/.*$', headers:globalHeaders, continue:true}
   ];
@@ -64,9 +64,7 @@ export function deploymentRoutes(manifest, config) {
   return routes;
 }
 
-/** Emit both static and executable artifacts where the Vercel build actually runs.
- * Uses Build Output API v3; never copies the repository wholesale or reads runtime secrets.
- */
+/** Build Output API v3. Runtime secrets and migration scripts are never public artifacts. */
 export function buildVercelOutput(sourceRoot, options = {}) {
   const context = buildContext(sourceRoot,options);
   const env=options.env || process.env;
@@ -108,7 +106,6 @@ export function buildVercelOutput(sourceRoot, options = {}) {
       copyFiles(installed,path.join(fn,relative),{skipHidden:true}); copiedPackages.push(relative);
     }
     writeJson(path.join(fn,'.vc-config.json'),{runtime:'nodejs22.x',handler:'api/billing.js',launcherType:'Nodejs',shouldAddHelpers:false,maxDuration:60});
-    // Verify resolution inside the isolated bundle, not against source node_modules.
     const require=createRequire(path.join(fn,'package.json'));
     const pg=require.resolve('pg');
     if (!pg.startsWith(fn+path.sep) || typeof require('pg').Pool !== 'function') throw new Error('Billing function is missing its database dependency.');
@@ -123,5 +120,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   const result=buildVercelOutput(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
   console.log(`[deploy] Build Output API v3 at ${result.output}`);
   console.log(`[deploy] ${result.staticRoutes} page routes; billing function /api/billing (nodejs22.x); ${result.runtimePackages} locked runtime packages`);
-  console.log('[deploy] No billing credentials, database migrations, or payment-mode changes were performed.');
+  console.log('[deploy] No credentials copied to artifacts. The separate production-only database release job follows.');
 }

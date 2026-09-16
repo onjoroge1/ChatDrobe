@@ -3,9 +3,11 @@ import {stripeClient} from '../server/stripe-client.mjs';
 import {billingService} from '../server/billing-service.mjs';
 import {connectStore} from '../server/pg-store.mjs';
 import {createHandler} from '../server/http.mjs';
+import {databaseProbe} from '../server/database-readiness.mjs';
 
-// The raw IncomingMessage stream is used. Do not read req.body before signature verification.
+// Keep raw webhook bytes. Readiness never enables billing and never performs migrations.
 export const config = {api: {bodyParser: false}};
+const databaseStatus=databaseProbe();
 let pending;
 export default createHandler(async () => {
   const cfg = configuration();
@@ -15,4 +17,4 @@ export default createHandler(async () => {
     return {config: cfg, store, service: billingService({config: cfg, store, stripe: stripeClient(cfg.stripeSecret)})};
   })().catch(error => { pending = null; throw error; });
   return pending;
-});
+},{databaseStatus});
