@@ -30,6 +30,8 @@ jobs:
         run: python tests/browser.py
       - name: Living Worlds HTTP browser checks
         run: python tests/living-browser.py
+      - name: Account and admin HTTP browser checks (simulated account API)
+        run: python tests/accounts-browser.py
       - uses: actions/upload-artifact@v5
         if: always()
         with:
