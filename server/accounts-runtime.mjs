@@ -13,7 +13,7 @@ export function accountRuntime(){
   const accounts={...original,session:ownerLogin.authenticateSession},payments=accountPayments({web,accounts,store});
   const base=accountService({accounts,billingStore:store,mailer:codeMailer(web),config:web,payments});
   const devices=extensionDevices({pool,store,owner});
-  const service={...base,ownerLogin:ownerLogin.login,async profile(user){const result=await base.profile(user);return {...result,extensionLinkingAvailable:true,user:{...result.user,identitySource:user.identitySource||'email_code',emailVerified:user.identitySource!=='operator_credentials'}};},async signoutAll(user){await devices.revokeAll(user);return base.signoutAll(user);}};
+  const service={...base,ownerLogin:ownerLogin.login,async admin(user,filters){const result=await base.admin(user,filters);return {...result,coverage:'Registered ChatDrobe accounts: email-verified users and explicitly provisioned owner accounts. Anonymous installations are not counted. Subscription columns are last-verified snapshots; Test Plus is not a live paying customer.'};},async profile(user){const result=await base.profile(user);return {...result,extensionLinkingAvailable:true,user:{...result.user,identitySource:user.identitySource||'email_code',emailVerified:user.identitySource!=='operator_credentials'}};},async signoutAll(user){await devices.revokeAll(user);return base.signoutAll(user);}};
   return {web,owner,ownerLogin,pool,accounts,store,payments,devices,service};
  })().catch(e=>{pending=null;throw e;});return pending;
 }
