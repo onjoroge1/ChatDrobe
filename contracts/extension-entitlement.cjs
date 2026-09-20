@@ -1,4 +1,4 @@
-/* Pinned-key, device-bound proof. Browser flags, imports and owner role cannot grant Plus. */
+/* Pinned-key, device-bound proof. Only signed server grants count; browser flags, emails and URLs never grant access. */
 (function(root){
  'use strict';
  function bytes(value){if(typeof value!=='string'||!/^[A-Za-z0-9_-]+$/.test(value))throw Error('Invalid entitlement encoding.');return Uint8Array.from(atob(value.replaceAll('-','+').replaceAll('_','/')+'='.repeat((4-value.length%4)%4)),c=>c.charCodeAt(0));}
@@ -10,7 +10,9 @@
   const key=await crypto.subtle.importKey('jwk',publicJwk,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);
   if(!await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},key,bytes(s),new TextEncoder().encode(h+'.'+p)))throw Error('Invalid entitlement signature.');
   if(claims.iss!=='chatdrobe-billing-test'||claims.aud!=='chatdrobe-extension'||claims.environment!=='test'||claims.did!==deviceId||!/^[a-f0-9]{64}$/.test(claims.sub||'')||!['free','plus'].includes(claims.plan)||!Number.isSafeInteger(claims.iat)||!Number.isSafeInteger(claims.exp)||claims.iat>now+30||claims.exp<=now||claims.exp<=claims.iat||claims.exp>claims.iat+600)throw Error('Expired or mismatched entitlement. Reconnect or refresh access.');
-  return Object.freeze({premium:claims.plan==='plus',testSubscription:claims.plan==='plus',paid:false,testerPreview:false,expiresAt:claims.exp,subject:claims.sub});
+  const source=claims.accessSource||(claims.plan==='plus'?'stripe_test':'free');
+  if(!['admin','stripe_test','free'].includes(source)||(claims.plan==='plus')===(source==='free'))throw Error('Invalid membership source.');
+  return Object.freeze({premium:claims.plan==='plus',adminPremium:source==='admin',accessSource:source,testSubscription:source==='stripe_test',paid:false,testerPreview:false,expiresAt:claims.exp,subject:claims.sub});
  }
  const api=Object.freeze({verify});if(typeof module!=='undefined'&&module.exports)module.exports=api;root.ChatDrobeEntitlement=api;
 })(globalThis);

@@ -1,7 +1,8 @@
 import {createHash, randomBytes, randomInt, timingSafeEqual} from 'node:crypto';
 export class AccountError extends Error {constructor(code,message,status=400){super(message);this.code=code;this.status=status;}}
 export const CANONICAL_ORIGIN='https://www.chatdrobe.com';
-export const CODE_SECONDS=600,SESSION_SECONDS=604800,ADMIN_SESSION_SECONDS=28800,ADMIN_FRESH_SECONDS=900;
+// Remember the account, not a premium boolean. Administrative operations still require fresh authentication.
+export const CODE_SECONDS=600,SESSION_SECONDS=2592000,ADMIN_SESSION_SECONDS=2592000,ADMIN_FRESH_SECONDS=900;
 export const COOKIE='__Host-chatdrobe_session',CHALLENGE_COOKIE='__Host-chatdrobe_login';
 export const hash=v=>createHash('sha256').update(v).digest('hex');
 export const secret=()=>randomBytes(32).toString('base64url');
@@ -29,7 +30,7 @@ export function setCookie(name,value,maxAge,{secure=true}={}){return `${name}=${
 export function requireOrigin(req,config){if(req.headers.origin!==config.origin||req.headers['sec-fetch-site']==='cross-site'||req.headers['x-chatdrobe-request']!=='account-v1')throw new AccountError('ORIGIN','Use the ChatDrobe website for this action.',403);}
 export function requireAdmin(user,{fresh=false,now=Math.floor(Date.now()/1000)}={}){
  if(!user||user.role!=='admin'||!user.verifiedAt||user.disabledAt)throw new AccountError('FORBIDDEN','Administrator access required.',403);
- if(fresh&&(!Number.isSafeInteger(user.authenticatedAt)||user.authenticatedAt<=0||user.authenticatedAt>now+30||now-user.authenticatedAt>ADMIN_FRESH_SECONDS))throw new AccountError('REAUTHENTICATE','Sign in again before changing payment activation.',401);
+ if(fresh&&(!Number.isSafeInteger(user.authenticatedAt)||user.authenticatedAt<=0||user.authenticatedAt>now+30||now-user.authenticatedAt>ADMIN_FRESH_SECONDS))throw new AccountError('REAUTHENTICATE','Sign in again for administrative operations. Your remembered account and linked Premium access are unchanged.',401);
 }
 export function safeUser(user){return {id:user.id,email:user.email,role:user.role,verified:!!user.verifiedAt,createdAt:user.createdAt,lastLoginAt:user.lastLoginAt};}
 export function subscriptionSummary(state={},now=Math.floor(Date.now()/1000)){

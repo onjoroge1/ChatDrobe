@@ -1,8 +1,8 @@
 import {randomUUID} from 'node:crypto';
-import {AccountError,email,secret,hash,billingId} from './accounts-policy.mjs';
+import {AccountError,email,secret,hash,billingId,SESSION_SECONDS} from './accounts-policy.mjs';
 import {verifyOwnerPassword} from './owner-credentials.mjs';
-const SECONDS=3600;
-/** Operator-provisioned identity only. A password never grants a paid plan. */
+const SECONDS=SESSION_SECONDS;
+/** Operator identity is remembered, but role and credential version are checked on each use. */
 export function ownerAccess({pool,store,accounts,configuration,now=()=>Math.floor(Date.now()/1000)}){
  async function authenticateSession(tokenHash,at){
   const user=await accounts.session(tokenHash,at);if(!user)return null;
