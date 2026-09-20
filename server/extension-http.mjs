@@ -3,8 +3,25 @@ import {AccountError,validSecret,hash} from './accounts-policy.mjs';
 import {BillingError} from './security.mjs';
 import {privateHeaders} from './accounts-http.mjs';
 import {bindDeviceLease} from './device-lease.mjs';
+import {accessSigningConfiguration,adminDeviceLease} from './premium-membership.mjs';
 const known=new Set(['start','poll','entitlement','disconnect']);
 function json(res,status,value){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(value));}
+export async function deviceEntitlement(rt,id){
+ let device=await rt.devices.device(id);
+ const connectionExpiresAt=Math.floor(new Date(device.expires_at).getTime()/1000);
+ if(device.role==='admin'){
+  const config=rt.accessSigningConfiguration?rt.accessSigningConfiguration():accessSigningConfiguration();
+  // Read the current role again before issuing a grant. Demotion is never masked by cached profile data.
+  device=await rt.devices.device(id);
+  if(device.role==='admin')return {...adminDeviceLease(config,device,id),linked:true,account:{email:device.email},connectionExpiresAt,billingEnabled:false,cancelAtPeriodEnd:false};
+ }
+ const dependencies=await rt.payments.dependencies();
+ if(!dependencies.config.enabled)return {linked:true,account:{email:device.email},plan:'free',accessSource:'free',environment:'test',billingEnabled:false,connectionExpiresAt,token:null};
+ const result=await dependencies.service.refresh(device.billing_id);
+ device=await rt.devices.device(id);
+ const lease=bindDeviceLease(dependencies.config,result,id,device.expires_at);
+ return {...lease,linked:true,account:{email:device.email},billingEnabled:true,connectionExpiresAt,cancelAtPeriodEnd:result.cancelAtPeriodEnd};
+}
 export function createExtensionHandler(runtime){return async(req,res)=>{
  privateHeaders(res);const requestId=randomUUID();
  try{
@@ -28,12 +45,8 @@ export function createExtensionHandler(runtime){return async(req,res)=>{
   }
   if(action==='disconnect'){await rt.devices.disconnect(id);json(res,200,{ok:true});return;}
   if(action==='poll'){json(res,200,await rt.devices.poll(id));return;}
-  const device=await rt.devices.device(id),dependencies=await rt.payments.dependencies();
-  if(!dependencies.config.enabled){json(res,200,{linked:true,account:{email:device.email},plan:'free',environment:'test',billingEnabled:false,token:null});return;}
-  const result=await dependencies.service.refresh(device.billing_id);
-  await rt.devices.device(id);
-  const lease=bindDeviceLease(dependencies.config,result,id);
+  const result=await deviceEntitlement(rt,id);
   await rt.pool.query('UPDATE public.chatdrobe_extension_devices SET last_seen=now() WHERE credential_hash=$1',[id]);
-  json(res,200,{...lease,linked:true,account:{email:device.email},billingEnabled:true,cancelAtPeriodEnd:result.cancelAtPeriodEnd});
+  json(res,200,result);
  }catch(e){const handled=e instanceof AccountError||e instanceof BillingError;if(!handled)console.error('extension access failed',requestId);json(res,handled?e.status:503,{error:{code:handled?e.code:'UNAVAILABLE',message:handled?e.message:'Extension account service is temporarily unavailable.',requestId}});}
 };}

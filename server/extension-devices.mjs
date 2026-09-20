@@ -33,7 +33,8 @@ export function extensionDevices({pool,store,owner,now=()=>Math.floor(Date.now()
  }
  async function device(credentialHash,{pending=false}={}){
   await store.limit('device-api-global',1200,60,now());await store.limit('device-api:'+credentialHash,30,60,now());
-  const row=(await pool.query('SELECT d.*,a.email,a.billing_id,a.disabled_at FROM public.chatdrobe_extension_devices d LEFT JOIN public.chatdrobe_accounts a ON a.id=d.account_id WHERE d.credential_hash=$1',[credentialHash])).rows[0];
+  // The current database role, not a role cached at pairing time, controls complimentary access.
+  const row=(await pool.query('SELECT d.*,a.email,a.billing_id,a.role,a.disabled_at FROM public.chatdrobe_extension_devices d LEFT JOIN public.chatdrobe_accounts a ON a.id=d.account_id WHERE d.credential_hash=$1',[credentialHash])).rows[0];
   if(!row||row.revoked_at||row.disabled_at||new Date(row.expires_at).getTime()<=now()*1000||(row.owner_version&&(!owner.ready||row.owner_version!==owner.version)))throw new AccountError('DEVICE_SIGN_IN_REQUIRED','Reconnect this extension to your ChatDrobe account.',401);
   if(!pending&&!row.account_id)throw new AccountError('LINK_PENDING','Approve the matching code on the ChatDrobe website.',409);
   return row;
