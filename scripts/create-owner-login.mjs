@@ -1,0 +1,12 @@
+import fs from 'node:fs';import path from 'node:path';import {randomBytes} from 'node:crypto';import {fileURLToPath} from 'node:url';
+import {makeOwnerHash} from '../server/owner-credentials.mjs';
+const out=process.argv[2];if(!out)throw new Error('Usage: node scripts/create-owner-login.mjs /private/folder/outside-repo');
+const folder=path.resolve(out),root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+if(folder===root||folder.startsWith(root+path.sep))throw new Error('Keep credentials outside the repository.');
+fs.mkdirSync(folder,{recursive:true,mode:0o700});
+if(fs.lstatSync(folder).isSymbolicLink())throw new Error('Use a private real directory.');
+const password=randomBytes(24).toString('base64url'),encoded=await makeOwnerHash(password);
+for(const file of ['vercel-owner.env','owner-login.txt'])if(fs.existsSync(path.join(folder,file)))throw new Error('Files already exist; no credentials replaced.');
+fs.writeFileSync(path.join(folder,'vercel-owner.env'),`ADMIN_EMAIL=kim.njo@gmail.com\nADMIN_PASSWORD_HASH=${encoded}\n`,{mode:0o600,flag:'wx'});
+fs.writeFileSync(path.join(folder,'owner-login.txt'),`Owner email: kim.njo@gmail.com\nOwner password: ${password}\n\nSave in your password manager. Put only the hash from vercel-owner.env in Vercel. Never put either file in GitHub. This login grants administration, not Plus.\n`,{mode:0o600,flag:'wx'});
+console.log('Created vercel-owner.env and owner-login.txt in the requested private folder. No credentials printed.');
