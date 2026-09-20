@@ -1,6 +1,6 @@
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath,pathToFileURL} from 'node:url';
 import {buildVercelOutput as baseBuild,deploymentRoutes as baseRoutes} from './build-vercel-base.mjs';
-const PRIVATE_RUNTIME=['api/extension.js','server/owner-credentials.mjs','server/owner-access.mjs','server/extension-devices.mjs','server/device-lease.mjs','server/extension-http.mjs','server/premium-membership.mjs'];
+const PRIVATE_RUNTIME=['api/extension.js','server/owner-credentials.mjs','server/owner-access.mjs','server/extension-devices.mjs','server/device-lease.mjs','server/extension-http.mjs','server/premium-membership.mjs','server/signing-key.mjs'];
 const extensionRoute={src:'^/api/extension/?$',dest:'/api/extension',headers:{'Cache-Control':'no-store, private','CDN-Cache-Control':'no-store','Vercel-CDN-Cache-Control':'no-store'}};
 export function deploymentRoutes(manifest,config){const routes=baseRoutes(manifest,config);routes.splice(2,0,extensionRoute);return routes;}
 export function buildVercelOutput(root,options={}){

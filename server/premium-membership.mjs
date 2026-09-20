@@ -1,6 +1,6 @@
-import {createPrivateKey,createPublicKey,createHash,sign,randomUUID} from 'node:crypto';
+import {sign,randomUUID} from 'node:crypto';
 import {AccountError} from './accounts-policy.mjs';
-
+import {loadSigningKey,signingHelp} from './signing-key.mjs';
 export const REMEMBER_SECONDS=30*86400;
 export const ACCESS_SECONDS=600;
 /** These inputs come from authenticated server records, never request-body role flags. */
@@ -9,14 +9,9 @@ export function membership(user,subscription={}){
  const admin=user.role==='admin';
  return {premium:admin||subscription.plan==='test_plus',source:admin?'admin':subscription.plan==='test_plus'?'stripe_test':'free',complimentary:admin,label:admin?'Admin Premium — complimentary':subscription.plan==='test_plus'?'Test Plus — verified subscription':'Free'};
 }
-/** Admin access needs the existing signing key, not a Stripe checkout or billing activation. */
+/** Complimentary access still requires a genuine signed proof. Never bypass a missing key. */
 export function accessSigningConfiguration(env=process.env){
- try{
-  const privateKey=createPrivateKey((env.BILLING_SIGNING_PRIVATE_KEY||'').replaceAll('\\n','\n'));
-  if(privateKey.asymmetricKeyType!=='ec'||privateKey.asymmetricKeyDetails?.namedCurve!=='prime256v1')throw Error();
-  const publicJwk=createPublicKey(privateKey).export({format:'jwk'});
-  return {privateKey,publicJwk,keyId:createHash('sha256').update(JSON.stringify(publicJwk)).digest('hex').slice(0,16)};
- }catch{throw new AccountError('ACCESS_SIGNING_NOT_READY','Your account is connected, but the server Premium-signing key is not configured correctly. No checkout is required for an administrator.',503);}
+ try{return loadSigningKey(env);}catch(error){throw new AccountError('ACCESS_SIGNING_NOT_READY',signingHelp(error.code)+' No checkout is required for an administrator.',503);}
 }
 export function adminDeviceLease(config,device,credentialHash,now=Math.floor(Date.now()/1000)){
  const end=Math.floor(new Date(device.expires_at).getTime()/1000);
