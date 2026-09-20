@@ -32,6 +32,8 @@ jobs:
         run: python tests/living-browser.py
       - name: Account and admin HTTP browser checks (simulated account API)
         run: python tests/accounts-browser.py
+      - name: Owner and extension-link HTTP browser checks (simulated account API)
+        run: python tests/owner-browser.py
       - uses: actions/upload-artifact@v5
         if: always()
         with:
