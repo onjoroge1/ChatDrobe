@@ -1,5 +1,6 @@
-import {createHash,createHmac,createPrivateKey,createPublicKey,sign,timingSafeEqual,randomUUID} from 'node:crypto';
+import {createHash,createHmac,createPublicKey,sign,timingSafeEqual,randomUUID} from 'node:crypto';
 import {databaseUrl as resolveDatabaseUrl} from './database-config.mjs';
+import {loadSigningKey} from './signing-key.mjs';
 export class BillingError extends Error {constructor(code,message,status=400){super(message);this.code=code;this.status=status;}}
 export const API_VERSION='2025-02-24.acacia',ISSUER='chatdrobe-billing-test',AUDIENCE='chatdrobe-extension',LEASE_SECONDS=600;
 export const clock=()=>Math.floor(Date.now()/1000),hash=value=>createHash('sha256').update(value).digest('hex');
@@ -10,7 +11,7 @@ export function configuration(env=process.env,{website=false}={}){
  if(!/^whsec_[a-zA-Z0-9]+$/.test(env.STRIPE_WEBHOOK_SECRET||''))throw new BillingError('CONFIGURATION','A webhook signing secret is required.',503);
  if(!/^price_[a-zA-Z0-9]+$/.test(env.STRIPE_PLUS_PRICE_ID||''))throw new BillingError('CONFIGURATION','A test recurring Price ID is required.',503);
  let origin,privateKey,databaseUrl;
- try{const u=new URL(env.BILLING_ORIGIN),local=!env.VERCEL&&env.BILLING_ALLOW_LOCALHOST==='true'&&['localhost','127.0.0.1'].includes(u.hostname);if((u.protocol!=='https:'&&!(local&&u.protocol==='http:'))||u.username||u.password||u.pathname!=='/'||u.search||u.hash)throw Error();origin=u.origin;privateKey=createPrivateKey((env.BILLING_SIGNING_PRIVATE_KEY||'').replaceAll('\\n','\n'));if(privateKey.asymmetricKeyType!=='ec'||privateKey.asymmetricKeyDetails.namedCurve!=='prime256v1')throw Error();databaseUrl=resolveDatabaseUrl(env);}catch{throw new BillingError('CONFIGURATION','Billing origin, database or P-256 signing key is not configured correctly.',503);}
+ try{const u=new URL(env.BILLING_ORIGIN),local=!env.VERCEL&&env.BILLING_ALLOW_LOCALHOST==='true'&&['localhost','127.0.0.1'].includes(u.hostname);if((u.protocol!=='https:'&&!(local&&u.protocol==='http:'))||u.username||u.password||u.pathname!=='/'||u.search||u.hash)throw Error();origin=u.origin;privateKey=loadSigningKey(env).privateKey;databaseUrl=resolveDatabaseUrl(env);}catch{throw new BillingError('CONFIGURATION','Billing origin, database or P-256 signing key is not configured correctly.',503);}
  const extensionIds=(env.BILLING_EXTENSION_IDS||'').split(',').filter(Boolean);
  if((!website&&!extensionIds.length)||extensionIds.some(id=>!/^[a-p]{32}$/.test(id)))throw new BillingError('CONFIGURATION','Allowlist the test extension ID before enabling extension billing.',503);
  const publicJwk=createPublicKey(privateKey).export({format:'jwk'});
