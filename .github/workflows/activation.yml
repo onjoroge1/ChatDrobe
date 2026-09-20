@@ -1,0 +1,28 @@
+name: Activation flow
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: activation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  activation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm run check
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install -r tests/requirements.txt
+          python -m playwright install --with-deps chromium
+      - name: Connection and payment return (simulated account/provider API)
+        run: python tests/activation-browser.py

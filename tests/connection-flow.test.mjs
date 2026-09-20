@@ -10,3 +10,4 @@ test('approval and success helpers are limited to account routes and have an exp
  assert.ok(fs.statSync('src/connection-flow.js').size<7000);
  const code=fs.readFileSync('src/connection-flow.js','utf8');assert.doesNotMatch(code,/localStorage|innerHTML|setInterval|chrome-extension:\/\//);assert.match(code,/https:\/\/chatgpt.com\//);assert.match(code,/attempts<3/);
 });
+test('failed fresh payment verification cannot present cached Premium as completed checkout',()=>{assert.equal(connectionState(subscriber,true,good,true,true).kind,'payment-pending');assert.equal(connectionState(admin,true,good,true,true).kind,'ready');});
