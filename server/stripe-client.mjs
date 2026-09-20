@@ -1,6 +1,6 @@
 import {API_VERSION,BillingError} from './security.mjs';
 export function stripeClient(secret,fetcher=fetch){return async function stripe(path,{method='GET',values={},idempotencyKey}={}){
- const regular=/^\/(customers|prices|subscriptions|checkout\/sessions|billing_portal\/sessions|invoices|charges)(\/[A-Za-z0-9_]+)?$/,setupRead=/^\/(webhook_endpoints\/we_[A-Za-z0-9]+|billing_portal\/configurations\/bpc_[A-Za-z0-9]+)$/;
+ const regular=/^\/(customers|prices|subscriptions|checkout\/sessions|billing_portal\/sessions|invoices|charges)(\/[A-Za-z0-9_]+)?$/,setupRead=/^\/(webhook_endpoints\/we_[A-Za-z0-9]+|billing_portal\/configurations(?:\/bpc_[A-Za-z0-9]+)?)$/;
  if(!regular.test(path)&&!(method==='GET'&&setupRead.test(path)))throw new BillingError('PROVIDER_PATH','Unsupported provider resource.');
  const params=new URLSearchParams();for(const[key,value]of Object.entries(values)){if(Array.isArray(value))for(const item of value)params.append(key,String(item));else params.append(key,String(value));}
  const url='https://api.stripe.com/v1'+path+(method==='GET'&&params.size?'?'+params:''),headers={Authorization:`Bearer ${secret}`,'Stripe-Version':API_VERSION};
