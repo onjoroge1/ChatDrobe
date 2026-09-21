@@ -68,7 +68,10 @@ try:
             page.evaluate('updatePilot({motion:true,active:true,busy:false,streaming:false,focused:false,quiet:false,pose:"rest"})')
             wait_until(page,lambda:page.evaluate('frame => pilot.diagnostics().frame !== frame',frame),'frame advance after resume')
         page.emulate_media(reduced_motion='reduce')
-        assert not page.evaluate('pilot.diagnostics().playing')
+        # CDP media emulation resolves before the browser delivers the queued
+        # MediaQueryList change event. Require both the preference and its pause
+        # effect, then measure a frozen frame; never force a manual scene update.
+        wait_until(page,lambda:page.evaluate('() => matchMedia("(prefers-reduced-motion: reduce)").matches && !pilot.diagnostics().playing'),'reduced-motion change event pausing playback',timeout_ms=2000)
         frame=page.evaluate('pilot.diagnostics().frame');page.wait_for_timeout(180)
         assert page.evaluate('pilot.diagnostics().frame')==frame
         page.emulate_media(reduced_motion='no-preference')
@@ -106,12 +109,15 @@ try:
         assert not errors,errors
         passed('No remote requests or CSP violations; teardown removes player SVG and restores fallback')
         failure=browser.new_page()
+        failure_errors=[]
+        failure.on('pageerror',lambda error:failure_errors.append(str(error)))
         failure.route('**/lottie-light-5.13.0.mjs',lambda route:route.abort())
         failure.goto(origin+'/tests/lottie-fixture.html')
         failure.get_by_role('button',name='Play',exact=True).click()
         wait_until(failure,lambda:failure.evaluate('() => pilot.diagnostics().failed'),'graceful blocked-import failure')
         expect(failure.locator('#fallback')).to_be_visible()
         expect(failure.locator('#animation svg')).to_have_count(0)
+        assert not failure_errors,failure_errors
         passed('Blocked runtime import leaves original artwork visible without an unhandled error')
         baseline=browser.new_page()
         baseline.goto(origin+'/tests/lottie-fixture.html')

@@ -108,12 +108,16 @@ with sync_playwright() as p:
  page.evaluate("document.querySelector('.markdown').style.height='900px'")
  wait_for_state(page,"env.diagnostics().state==='blocked'")
  assert not page.locator('#chatdrobe-environment').is_visible()
+ assert page.locator('#chatdrobe-environment').evaluate("node=>node.hidden&&getComputedStyle(node).display==='none'&&node.getClientRects().length===0"),'Blocked world must have no painted layout box despite :host display styles'
  page.evaluate("document.querySelector('.markdown').style.height=''")
  wait_for_state(page,"()=>{const d=env.diagnostics();return d.visible&&d.layout?.fallback==='conversation-gap';}")
+ assert page.locator('#chatdrobe-environment').is_visible(),'Cleared obstruction restores actual artwork, not only diagnostics'
  page.evaluate("const n=document.createElement('nav');n.id='native-overlay';n.style.cssText='position:fixed;left:210px;right:0;top:250px;bottom:100px';document.body.append(n)")
  wait_for_state(page,"env.diagnostics().state==='blocked'")
+ assert not page.locator('#chatdrobe-environment').is_visible(),'Native overlay must remove world paint'
  page.evaluate("document.querySelector('#native-overlay').remove()")
  wait_for_state(page,"()=>{const d=env.diagnostics();return d.visible&&d.layout?.fallback==='conversation-gap';}")
+ assert page.locator('#chatdrobe-environment').is_visible()
  passed('Narrow fallback stays between measured message/composer and withdraws for growth or native overlays')
  for i in range(12):page.evaluate("env.configure({...roomPrefs,enabled:false});applyRoom({livingMotion:true})")
  page.evaluate('env.dispose()');assert page.locator('#chatdrobe-environment').count()==0;assert not page.evaluate('env.diagnostics().quiet.timer')

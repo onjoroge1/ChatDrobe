@@ -19,7 +19,10 @@ export function createEnvironment(doc,win){
   if(host||!doc.body)return;
   host=doc.createElement('div');host.id='chatdrobe-environment';host.setAttribute('aria-hidden','true');host.inert=true;
   host.style.cssText='position:fixed;z-index:2;pointer-events:none!important;user-select:none!important;overflow:hidden;contain:layout style paint;';
-  shadow=host.attachShadow({mode:'open'});const style=new win.CSSStyleSheet();style.replaceSync(SCENE_CSS);shadow.adoptedStyleSheets=[style];
+  shadow=host.attachShadow({mode:'open'});const style=new win.CSSStyleSheet();
+  // Scene :host display:block is author CSS and overrides the UA [hidden] rule.
+  // Enforce real paint suppression for blocked layouts and provisional remeasures.
+  style.replaceSync(SCENE_CSS+'\n:host([hidden]){display:none!important;}');shadow.adoptedStyleSheets=[style];
   scene=createScene(doc,world);if(prefs?.livingCompanionOnly)scene.setCompanionOnly?.();shadow.append(scene.element);doc.body.append(host);metrics.mounts++;
   if(typeof win.ResizeObserver==='function')resize=new win.ResizeObserver(scheduleGeometry);
   // Observe native layout changes only. The scene is outside main and its own
