@@ -71,7 +71,8 @@ with sync_playwright() as p:
  for world in ['tokyo','starship','train']:
   page.emulate_media(reduced_motion='no-preference');page.evaluate('(id)=>applyRoom({livingWorld:id,livingMotion:false})',world)
   assert page.locator('#chatdrobe-environment').locator('button,input,[role=status]').count()==0
-  assert page.evaluate('env.diagnostics().sceneNodes')<=320
+  node_count=page.evaluate('env.diagnostics().sceneNodes')
+  assert node_count<=320,(world,node_count)
   if world!='starship':
    bounds=room.locator('.companion-habitat').bounding_box();form=page.locator('form').bounding_box()
    assert bounds['x']>=form['x']+form['width'] or bounds['x']+bounds['width']<=form['x'],(bounds,form)

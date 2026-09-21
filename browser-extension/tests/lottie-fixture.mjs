@@ -7,4 +7,5 @@ document.querySelector('#still').addEventListener('click',()=>updatePilot({motio
 document.querySelector('#play').addEventListener('click',()=>updatePilot({motion:true,busy:false}));
 document.querySelector('#pause').addEventListener('click',()=>updatePilot({busy:true}));
 document.querySelector('#destroy').addEventListener('click',()=>pilot.destroy());
+document.querySelector('#baseline').addEventListener('click',()=>{pilot.destroy();document.body.dataset.baseline='css';});
 updatePilot({});

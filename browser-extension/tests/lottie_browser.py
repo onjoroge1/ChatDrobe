@@ -101,8 +101,19 @@ try:
         expect(failure.locator('#fallback')).to_be_visible()
         expect(failure.locator('#animation svg')).to_have_count(0)
         passed('Blocked runtime import leaves original artwork visible without an unhandled error')
+        baseline=browser.new_page()
+        baseline.goto(origin+'/tests/lottie-fixture.html')
+        baseline.get_by_role('button',name='CSS baseline',exact=True).click()
+        baseline_session=baseline.context.new_cdp_session(baseline)
+        baseline_session.send('Performance.enable')
+        def baseline_metrics():return {item['name']:item['value'] for item in baseline_session.send('Performance.getMetrics')['metrics']}
+        baseline_before=baseline_metrics();baseline.wait_for_timeout(1200);baseline_after=baseline_metrics()
+        performance['cssBaselineTaskMilliseconds']=round((baseline_after['TaskDuration']-baseline_before['TaskDuration'])*1000,3)
+        performance['cssBaselineHeapDeltaBytes']=baseline_after['JSHeapUsedSize']-baseline_before['JSHeapUsedSize']
+        assert not baseline.evaluate('pilot.diagnostics().loaded')
         runtime=(ROOT/'extension/living/vendor/lottie-light-5.13.0.mjs').read_bytes()
         result={'scope':'Real local ESM/SVG runtime in synthetic Chromium fixture; not installed extension or live ChatGPT','browser':browser.version,'checks':checks,'runtimeBytes':len(runtime),'runtimeGzipBytes':len(gzip.compress(runtime,mtime=0)),'animationDomNodes':nodes,'performance':performance}
         (OUT/'lottie-browser-results.json').write_text(json.dumps(result,indent=2)+'\n')
+        print('LOTTIE_METRICS',json.dumps(result),flush=True)
         browser.close()
 finally:server.shutdown()
