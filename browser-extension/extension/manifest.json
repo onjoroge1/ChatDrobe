@@ -1,0 +1,81 @@
+{
+  "manifest_version": 3,
+  "name": "ChatDrobe \u2014 Themes & Workspace (Sandbox Test)",
+  "version": "0.7.0",
+  "description": "Original themes, reading controls and a local workspace for use with ChatGPT. Independent; not affiliated with OpenAI.",
+  "minimum_chrome_version": "120",
+  "permissions": [
+    "storage",
+    "sidePanel",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open ChatDrobe"
+  },
+  "side_panel": {
+    "default_path": "workspace.html"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+M"
+      },
+      "description": "Open ChatDrobe"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "prefs.js",
+        "adapter.js",
+        "boot.js"
+      ],
+      "css": [
+        "themes.css",
+        "theme.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": false,
+      "world": "ISOLATED"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src https://www.chatdrobe.com; base-uri 'none'; form-action 'none'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "idle.js",
+        "world-routines.js",
+        "living/engine.mjs",
+        "living/model.mjs",
+        "living/scene.mjs",
+        "living/quiet-scene.mjs",
+        "living/quiet-policy.mjs",
+        "living/companion-motion.mjs",
+        "living/companion-rig.mjs"
+      ],
+      "matches": [
+        "https://chatgpt.com/*"
+      ]
+    }
+  ],
+  "homepage_url": "https://www.chatdrobe.com/",
+  "optional_host_permissions": [
+    "https://www.chatdrobe.com/*"
+  ]
+}

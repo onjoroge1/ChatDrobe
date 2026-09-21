@@ -1,0 +1,26 @@
+ChatDrobe v0.7.0 — Natural Motion / Premium test build
+
+UPDATE AN EXISTING INSTALLATION
+Back up important notes and your existing extension folder. Extract this ZIP, then replace the runtime files inside the SAME folder already loaded in Chrome. Reload the existing ChatDrobe card at chrome://extensions, refresh ChatGPT, and confirm About shows 0.7.0. The ZIP has manifest.json at its top level. Do not uninstall, clear storage or revoke your existing account connection just to update.
+
+Existing account/login, signing configuration, Premium verification and local-data modules are unchanged from v0.6.2. No Vercel changes or new key are required by this update. An existing valid account connection is preserved by updating in place. Expired access is still refreshed/verified normally; no local Premium bypass is included.
+
+INSPECT THE NEW MOTION WITHOUT WAITING
+Open Living -> Preview the motion — no waiting. Choose a performance and Play. Use Companion close-up or the still-pose slider to inspect the articulated cat. The studio is a separate preview tab, not information added over your ChatGPT conversation. Its motion runs only when requested. Real workspace activity cancels idle actions; preview controls deliberately do not.
+
+USE IT IN A LIVING WORLD
+Choose Rainy Tokyo Loft or Cozy Train Journey and Enter world. Enable Ambient scene motion explicitly. Set Companion behavior to Progressive; keep Quiet during focus on for productive sessions. Return focus to the ChatGPT page. With no input, brief noticing begins after 45 seconds; grooming becomes eligible after 2 minutes, stretch/knead after 4, and curling/docking after 8. At most one short routine runs between long quiet gaps. The companion then sleeps with automatic motion stopped by 10 minutes. Inactivity may mean reading; use Subtle or switch motion off when appropriate.
+
+USE THE CAT WITH A STATIC PREMIUM THEME
+Select a theme such as Starlit Cat. In Play choose Use the natural cat in this theme. This explicitly enables a compact in-place cat in a protected margin without a full room. Select Progressive or Subtle behavior. Existing opted-in cat walk routines also use this rig; merely importing an appearance or enabling decorative bobbing does not activate idle monitoring.
+
+PRODUCTIVITY AND SAFETY
+Input cancels the current performance immediately and motion waits 10 seconds after input before gently settling. Selection, composition, supported response-streaming controls, native media playback, Quiet Focus, reduced motion, hidden/unfocused tabs and unsafe placement suppress motion. No walking across messages, overlay labels, counters, pop-ups, sound, transcript inspection or activity-history storage was added. Native control detection and safe placement still need testing in your current signed-in ChatGPT layout.
+
+ATMOSPHERE RECIPES
+Living includes Rainy writing, Deep-space focus and Snowy window seat. These select existing worlds/weather/lighting; they do not enable motion, start a focus timer or change saved notes. Follow focus journey now persists correctly as a lighting preference.
+
+FIRST ACCOUNT CONNECTION (ONLY IF NOT ALREADY CONNECTED)
+Select a Premium world and Sign in / connect account. Allow optional www.chatdrobe.com access, open the prefilled approval link, sign in and approve the matching code. Return to the extension, refresh if necessary, and use Open ChatGPT after Premium is verified. Administrators retain complimentary Premium. Identity/device links may last up to 30 days; signed access still expires within ten minutes and refreshes periodically.
+
+All 15 static themes and 3 Living environments remain. Permissions, billing destinations and public signing key are unchanged. No private key or provider secret is included. This sandbox test package is not a public live-payment or Chrome Web Store release.
