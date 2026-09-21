@@ -26,6 +26,7 @@ def color(page,selector,prop='color'):
 
 with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=os.getenv('CHROMIUM_PATH',shutil.which('chromium')),headless=True,args=['--no-sandbox'])
+    browser_version=browser.version
     page=browser.new_page(viewport={'width':1440,'height':1040})
     errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     content(page)
@@ -180,6 +181,12 @@ with sync_playwright() as p:
     script(panel,'panel-style.js');script(panel,'workspace.js')
     expect(panel.get_by_role('button',name='Free · 11',exact=True)).to_be_visible()
     assert panel.locator('.world').count()==19
+    first_card=panel.locator('.world').first.bounding_box()
+    assert first_card and first_card['y']<560, ('Gallery starts too far below its controls',first_card)
+    assert panel.locator('.content').evaluate('(n)=>n.scrollWidth<=n.clientWidth'), 'Panel content overflows horizontally'
+    assert not panel.locator('.motionHelp').evaluate('(n)=>n.open')
+    passed('Initial 360px panel shows the first world above 560px without horizontal overflow; motion details start collapsed')
+    panel.screenshot(path=str(OUT/'initial-gallery.png'))
     panel.get_by_role('button',name='Premium',exact=True).click()
     assert panel.locator('.world').count()==8
     panel.get_by_role('button',name='Connect for Starlit Cat').click()
@@ -235,5 +242,5 @@ with sync_playwright() as p:
     assert not errors,errors
     passed('No uncaught runtime errors in page and side-panel fixtures')
     browser.close()
-(OUT/'browser-results.json').write_text(json.dumps({'environment':'offline Chromium 144 fixture; no installed extension or signed-in ChatGPT session','groups':len(checks),'passed':checks},indent=2)+'\n')
+(OUT/'browser-results.json').write_text(json.dumps({'environment':f'offline Chromium {browser_version} fixture; no installed extension or signed-in ChatGPT session','groups':len(checks),'passed':checks},indent=2)+'\n')
 print(len(checks),'browser scenario groups passed.')

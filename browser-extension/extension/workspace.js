@@ -79,7 +79,7 @@
   }
   function pageStatusText(){
     if(DEMO)return 'Panel preview only. Open the installed extension on ChatGPT to check display.';
-    if(!pageStatus)return 'Selection is saved. Check the active ChatGPT tab to confirm display.';
+    if(!pageStatus)return 'Saved locally. Page display not checked.';
     if(pageStatus.state==='paused'&&!pageStatus.visible)return ['Selection saved; the scene is currently hidden.',pageStatus.reason,pageStatus.action].filter(Boolean).join(' ');
     const lead=({applied:'Theme styling reached the active ChatGPT tab.',displayed:'Displayed on the active ChatGPT tab.',paused:'Visible on the active ChatGPT tab; motion is paused.',blocked:'Selected, but the scene cannot be displayed here.',off:'Styling is paused.',loading:'Selected; waiting for the active ChatGPT tab.',unconfirmed:'Selection saved; page display is not confirmed.'})[pageStatus.state]||'Page display is not confirmed.';
     return [lead,pageStatus.reason,pageStatus.action].filter(Boolean).join(' ');
@@ -214,27 +214,28 @@
   function changeTab(next){if(noteDirty){info('Save your notes before switching sections.',true);return;}tab=next;render();}
   function render(){
     nav.replaceChildren(...[['worlds','Worlds'],['read','Read'],['tools','Tools'],['account','Account'],['about','About']].map(([key,label])=>button(label,()=>changeTab(key),'',{'aria-pressed':String(tab===key||key==='worlds'&&['living','play'].includes(tab))})));
-    body.replaceChildren();
+    body.className=tab==='worlds'?'content worldsContent':'content';body.replaceChildren();
     if(tab==='worlds')renderWorlds();else if(tab==='read')renderRead();else if(tab==='living')renderLiving();else if(tab==='play')renderPlay();else if(tab==='tools')renderTools();else if(tab==='account')renderAccount();else renderAbout();
     syncClock();
   }
   function renderWorlds(){
-    body.append(...title('ONE WORKSPACE, YOUR CHOICE','Find your world.','Choose motion, then select a world to apply both. Themes, Living Worlds and companions live here.'));
+    body.append(...title('YOUR WORKSPACE','Find your world.','Choose motion, then select a world to apply both.'));
     const active=P.experience(s.prefs);
     const mode=el('select',{'aria-label':'Gallery appearance',on:{change:async e=>{await settings({mode:e.target.value},true);await checkPageExperience();}}},...[
       ['light','Light'],['dark','Dark'],['theme','Each world’s original palette'],['system','Follow system'],['chatgpt','Follow ChatGPT']
     ].map(([value,label])=>el('option',{value},label)));mode.value=s.prefs.mode;
-    body.append(field('Appearance',mode,s.prefs.mode==='chatgpt'?'Cards show the system palette as a preview. The page follows ChatGPT’s own light or dark setting.':''));
+    const appearance=field('Appearance',mode);appearance.className='field galleryAppearance';body.append(appearance);
+    if(s.prefs.mode==='chatgpt')body.append(el('p',{class:'tiny'},'Cards preview the system palette; the page follows ChatGPT.'));
     body.append(el('div',{class:'motionChoice',role:'group','aria-label':'Motion'},el('span',{class:'fieldTitle'},'Motion for your next selection'),el('div',{class:'motionOptions'},...[
       ['still','Still'],['subtle','Subtle'],['playful','Playful']
-    ].map(([value,label])=>button(label,()=>{motionChoice=value;render();},'',{'aria-pressed':String(motionChoice===value)}))),el('p',{class:'tiny'},active.kind==='theme'?'Still has no animation. Subtle and Playful use the same gentle decoration movement on themes; Living Worlds and Natural Cat add idle routines in Playful.':'Still has no animation. Subtle keeps movement quiet; Playful adds idle routines. Reduced motion and reading activity can pause either.'),el('p',{class:'tiny'},`Current selection’s motion: ${active.motion}. Select a card to apply a new choice.`)));
+    ].map(([value,label])=>button(label,()=>{motionChoice=value;render();},'',{'aria-pressed':String(motionChoice===value)}))),el('div',{class:'motionMeta'},el('p',{class:'tiny'},`Applied: ${active.motion}. Select a card to change.`),el('details',{class:'motionHelp'},el('summary',{},'How motion works'),el('p',{class:'tiny'},'Still has no animation. Themes use the same gentle decoration movement for Subtle and Playful. Living Worlds and Natural Cat add idle routines in Playful. Reduced motion and reading activity can pause movement.')))));
     body.append(el('div',{class:'experienceStatus'},el('p',{'data-page-status':'',role:'status'},pageStatusText()),button('Check display',()=>checkPageExperience(),'ghost')));
     if(['stroll','bites'].includes(s.prefs.idleMode))body.append(el('p',{class:'readingNote'},`Advanced effect selected: ${s.prefs.idleMode==='bites'?'Word Bites':'world routine'}. Choosing a world returns to its motion choice.`));
     body.append(el('div',{class:'tierTabs',role:'group','aria-label':'Theme collection'},
       button('All worlds',()=>{tier='all';filter='All';render();},'',{'aria-pressed':String(tier==='all')}),
       button('Free · '+C.THEMES.filter(t=>t.plan==='free').length,()=>{tier='free';filter='All';render();},'',{'aria-pressed':String(tier==='free')}),
       button('Premium',()=>{tier='pro';filter='All';render();},'',{'aria-pressed':String(tier==='pro')})));
-    if(tier!=='free')body.append(el('p',{class:'premiumNote'},access.premium?(access.adminPremium?'Admin Premium · complimentary':'Test Plus verified.'):'Premium selections require a verified account. Your world and motion choice are remembered while you connect.'));
+    if(tier!=='free')body.append(el('p',{class:'premiumNote'},access.premium?(access.adminPremium?'Admin Premium · complimentary':'Test Plus verified.'):'Premium requires a connected, verified account.'));
     body.append(el('div',{class:'filters'},...['All','Themes','Living Worlds','Companion'].map(v=>button(v,()=>{filter=v;render();},'chip',{'aria-pressed':String(filter===v)}))));
     const grid=el('div',{class:'grid'});
     const entries=[...C.THEMES.map(t=>({kind:'theme',id:t.id,theme:t,name:t.name,label:t.label,plan:t.plan,description:t.description})),
