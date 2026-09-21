@@ -99,8 +99,11 @@ for(const preview of document.querySelectorAll('[data-living-preview]')){
  listen(reduced,'change',()=>{if(reduced.matches){requested=false;tour.pause();}visibility();});
  for(const event of ['focus','blur','pageshow'])listen(window,event,visibility);
  listen(document,'visibilitychange',visibility);
- const observer='IntersectionObserver' in window?new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;visibility();}):null;
+ // Show the current bundled artwork when the preview enters view, still by
+ // default. Loading the scene does not enable motion or load its Lottie player.
+ const observer='IntersectionObserver' in window?new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible&&!renderer&&!loading)use(()=>{});visibility();}):null;
  observer?.observe(preview);
  listen(window,'pagehide',event=>{tour.visible(false);if(!event.persisted){alive=false;tour.destroy();scene?.dispose?.();observer?.disconnect();events.abort();sequence++;}});
  visibility();
+ if(!observer)use(()=>{});
 }

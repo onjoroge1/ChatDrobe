@@ -1,0 +1,10 @@
+import {createLottiePilot} from '../extension/living/lottie-pilot.mjs';
+window.policyViolations=[];document.addEventListener('securitypolicyviolation',event=>window.policyViolations.push(event.violatedDirective));
+window.pilot=createLottiePilot(document,{container:document.querySelector('#animation'),fallback:document.querySelector('#fallback')});
+window.pilotState={motion:false,active:true};
+window.updatePilot=patch=>{Object.assign(window.pilotState,patch);window.pilot.update(window.pilotState);document.querySelector('#status').textContent=JSON.stringify(window.pilot.diagnostics());};
+document.querySelector('#still').addEventListener('click',()=>updatePilot({motion:false}));
+document.querySelector('#play').addEventListener('click',()=>updatePilot({motion:true,busy:false}));
+document.querySelector('#pause').addEventListener('click',()=>updatePilot({busy:true}));
+document.querySelector('#destroy').addEventListener('click',()=>pilot.destroy());
+updatePilot({});

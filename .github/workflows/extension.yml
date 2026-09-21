@@ -29,7 +29,10 @@ jobs:
           python -m pip install -r browser-extension/tests/requirements.txt
           python -m playwright install --with-deps chromium
       - name: Offline Chromium fixtures (not native extension certification)
-        run: python browser-extension/tests/browser.py
+        run: |
+          python browser-extension/tests/browser.py
+          python browser-extension/tests/quiet_browser.py
+          python browser-extension/tests/lottie_browser.py
       - uses: actions/upload-artifact@v5
         if: always()
         with:

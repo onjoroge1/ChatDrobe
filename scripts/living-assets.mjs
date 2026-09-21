@@ -15,15 +15,19 @@ export function writeLivingAssets(root,assets){
  const renderer=(quiet.slice(0,quietStart)+quiet.slice(quietEnd))
   .replace("import {createScene as baseScene,SCENE_CSS as BASE_CSS} from './scene.mjs';","import {createScene as baseScene} from './living-base.js';")
   .replaceAll("'./companion-rig.mjs'","'./living-companion-rig.js'")
-  .replaceAll("'./companion-motion.mjs'","'./living-companion-motion.js'");
+  .replaceAll("'./companion-motion.mjs'","'./living-companion-motion.js'")
+  .replaceAll("'./lottie-pilot.mjs'","'./living-lottie-pilot.js'")
+  .replaceAll("'./art/","'./living-art/");
  fs.mkdirSync(assets,{recursive:true});
  for(const[name,source]of Object.entries({
   'living-base.js':baseRenderer,
   'living-renderer.js':renderer,
   'living-model.js':read('model.mjs'),
   'living-companion-rig.js':read('companion-rig.mjs').replaceAll("'./companion-motion.mjs'","'./living-companion-motion.js'"),
-  'living-companion-motion.js':read('companion-motion.mjs')
+  'living-companion-motion.js':read('companion-motion.mjs'),
+  'living-lottie-pilot.js':read('lottie-pilot.mjs').replaceAll("'./art/","'./living-art/").replaceAll("'./vendor/","'./living-vendor/")
  }))fs.writeFileSync(path.join(assets,name),source);
+ for(const dir of ['art','vendor'])fs.cpSync(path.join(sourceRoot,dir),path.join(assets,'living-'+dir),{recursive:true});
  fs.copyFileSync(path.join(root,'src/living-tour.mjs'),path.join(assets,'living-tour.js'));
  // The stylesheet is external to preserve the website's no-inline-style policy.
  fs.writeFileSync(path.join(assets,'living-runtime.css'),SCENE_CSS+'\n.caption{display:none}.room{border-radius:inherit}\n');

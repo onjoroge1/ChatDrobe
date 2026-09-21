@@ -15,7 +15,7 @@
   document.documentElement.append(root);
   let access={premium:false,testerPreview:false,paid:false},demoPreview=false;
   let s=C.state(),desiredPrefs=s.prefs,tab='worlds',filter='All',tier='all',tool='prompts',open=true,promptQuery='',lastFocus=null;
-  let motionChoice='still',pageStatus=null,pageCheck=0,expectedRevision=0;
+  let motionChoice='still',pageStatus=null,pageCheck=0,expectedRevision=0,pageTick=null,pageHidden=false;
   let localQueue=Promise.resolve(),uiQueue=Promise.resolve(),noteDirty=false,noteSaving=false,clockTick=null,lastScene=null;
   // Sandboxed previews may not expose localStorage. The demo can still run in memory.
   let demoStorage=null,demoMemory={};
@@ -59,23 +59,28 @@
     if(!reply?.ok)throw new Error(reply?.error||'Extension was reloaded. Refresh this page.');
     access=reply.access||access;desiredPrefs=P.prefs(reply.desiredPrefs||reply.state?.prefs);expectedRevision=reply.revision??expectedRevision;return C.state(reply.state);
   }
-  function mutate(action,redraw=false){
-    const run=uiQueue.catch(()=>{}).then(async()=>{
-      try{s=await request('mutate',action);apply();if(redraw)render();info(DEMO&&!demoStorage?'Demo saved in memory only.':'Saved on this browser.');return true;}
-      catch(err){info(err.message||'Could not save changes.',true);return false;}
-    });uiQueue=run;return run;
+  function enqueueUI(task){const run=uiQueue.catch(()=>{}).then(task);uiQueue=run;return run;}
+  async function saveAction(action,redraw=false){
+    try{
+      const before=JSON.stringify(s.prefs);s=await request('mutate',action);motionChoice=P.experience(s.prefs).motion;
+      if(before!==JSON.stringify(s.prefs)){pageStatus=null;pageCheck++;}
+      apply();if(redraw)render();schedulePageCheck(true);info(DEMO&&!demoStorage?'Demo saved in memory only.':'Saved on this browser.');return true;
+    }catch(err){info(err.message||'Could not save changes.',true);return false;}
   }
+  function mutate(action,redraw=false){return enqueueUI(()=>saveAction(action,redraw));}
   async function openUpgrade(world='',target=null){
     if(DEMO){info('Premium upgrade preview. Checkout is not connected; no payment is collected.');return;}
     try{info('Checking Premium access…');const reply=await chrome.runtime.sendMessage({scope:'mooddock',kind:'open-upgrade',world,target});if(!reply?.ok)throw new Error(reply?.error||'Could not check access.');if(reply.applied){access=reply.access;s=C.state(reply.state);desiredPrefs=P.prefs(reply.desiredPrefs||s.prefs);expectedRevision=reply.revision??expectedRevision;motionChoice=P.experience(s.prefs).motion;apply();render();await checkPageExperience();}else info(reply.errorHint||'Selection remembered, including motion. Connect your account to verify Premium, then return to ChatGPT.');}catch(e){info(e.message,true);}
   }
-  async function selectExperience(value){
-    const selection={motion:motionChoice,...value};
-    if(!access.premium&&ChatDrobeAccess.requiresPremium(C.selectExperience(s.prefs,selection))){await openUpgrade(selection.kind==='theme'?selection.id:'',selection);return false;}
-    pageStatus=null;
-    if(!await mutate({type:'select-experience',value:selection},true))return false;
-    motionChoice=P.experience(s.prefs).motion;
-    await checkPageExperience();return true;
+  function selectExperience(value){
+    // Resolve the active world inside the mutation queue: a quick motion click
+    // after choosing a new card must change the new world, not restore the old one.
+    return enqueueUI(async()=>{
+      const selection={...P.experience(s.prefs),...value};
+      if(!access.premium&&ChatDrobeAccess.requiresPremium(C.selectExperience(s.prefs,selection))){await openUpgrade(selection.kind==='theme'?selection.id:'',selection);return false;}
+      if(!await saveAction({type:'select-experience',value:selection},true))return false;
+      void checkPageExperience();return true;
+    });
   }
   function pageStatusText(){
     if(DEMO)return 'Panel preview only. Open the installed extension on ChatGPT to check display.';
@@ -84,23 +89,38 @@
     const lead=({applied:'Theme styling reached the active ChatGPT tab.',displayed:'Displayed on the active ChatGPT tab.',paused:'Visible on the active ChatGPT tab; motion is paused.',blocked:'Selected, but the scene cannot be displayed here.',off:'Styling is paused.',loading:'Selected; waiting for the active ChatGPT tab.',unconfirmed:'Selection saved; page display is not confirmed.'})[pageStatus.state]||'Page display is not confirmed.';
     return [lead,pageStatus.reason,pageStatus.action].filter(Boolean).join(' ');
   }
-  function drawPageStatus(){for(const node of shadow.querySelectorAll('[data-page-status]'))node.textContent=pageStatusText();}
-  async function checkPageExperience(){
+  function drawPageStatus(){const text=pageStatusText();for(const node of shadow.querySelectorAll('[data-page-status]'))if(node.textContent!==text)node.textContent=text;}
+  function watchesPage(){return SIDE&&!DEMO&&open&&!document.hidden&&!pageHidden&&tab==='worlds';}
+  function stopPageChecks(){clearTimeout(pageTick);pageTick=null;pageCheck++;}
+  // One completion-scheduled poll, only while its gallery is visible. Background
+  // updates never replace action feedback or repeatedly announce unchanged text.
+  function schedulePageCheck(immediate=false){
+    clearTimeout(pageTick);pageTick=null;
+    if(!watchesPage())return;
+    pageTick=setTimeout(()=>{pageTick=null;void checkPageExperience({announce:false});},immediate?0:3000);
+  }
+  async function checkPageExperience({announce=true}={}){
+    clearTimeout(pageTick);pageTick=null;
     const check=++pageCheck;
-    if(DEMO){info(pageStatusText());return;}
-    pageStatus={state:'loading'};drawPageStatus();
-    for(let attempt=0;attempt<4;attempt++){
-      try{
-        const reply=await chrome.runtime.sendMessage({scope:'mooddock',kind:'diagnostics'});
-        if(check!==pageCheck)return;
-        if(!reply?.ok)throw new Error(reply?.error||'Open a ChatGPT conversation and refresh it after installing this build.');
-        const active=P.experience(s.prefs),observed=reply.experience;
-        const matches=observed&&observed.kind===active.kind&&observed.id===active.id&&observed.motion===active.motion&&(observed.revision??0)>=expectedRevision;
-        if(matches&&observed.state!=='loading'){pageStatus=observed;drawPageStatus();info(pageStatusText(),observed.state==='blocked');return;}
-        if(attempt<3)await new Promise(resolve=>setTimeout(resolve,200));
-      }catch(error){pageStatus={state:'unconfirmed',action:error.message};drawPageStatus();info(pageStatusText());return;}
-    }
-    pageStatus={state:'unconfirmed',action:'Keep ChatGPT open, then choose Check display again.'};drawPageStatus();info(pageStatusText());
+    if(DEMO){if(announce)info(pageStatusText());return;}
+    if(announce){pageStatus={state:'loading'};drawPageStatus();}
+    const attempts=announce?4:1;
+    try{
+      for(let attempt=0;attempt<attempts;attempt++){
+        try{
+          if(check!==pageCheck)return;
+          const reply=await chrome.runtime.sendMessage({scope:'mooddock',kind:'diagnostics'});
+          if(check!==pageCheck)return;
+          if(!reply?.ok)throw new Error(reply?.error||'Open a ChatGPT conversation and refresh it after installing this build.');
+          const active=P.experience(s.prefs),observed=reply.experience;
+          const matches=observed&&observed.kind===active.kind&&observed.id===active.id&&observed.motion===active.motion&&(observed.revision??0)>=expectedRevision;
+          if(matches&&observed.state!=='loading'){pageStatus=observed;drawPageStatus();if(announce)info(pageStatusText(),observed.state==='blocked');return;}
+          if(attempt<attempts-1)await new Promise(resolve=>setTimeout(resolve,200));
+        }catch(error){if(check!==pageCheck)return;pageStatus={state:'unconfirmed',action:error.message};drawPageStatus();if(announce)info(pageStatusText());return;}
+      }
+      if(check!==pageCheck)return;
+      pageStatus={state:'unconfirmed',action:'Keep ChatGPT open. Display status updates automatically while this gallery is visible.'};drawPageStatus();if(announce)info(pageStatusText());
+    }finally{if(check===pageCheck)schedulePageCheck();}
   }
   function settings(value,redraw=false){
     if(!access.premium&&ChatDrobeAccess.requiresPremium(value)){void openUpgrade(value.theme||'',value);render();return Promise.resolve(false);}
@@ -190,7 +210,7 @@
     if(DEMO)document.body.dataset.mdPanel=String(open);
     if(open){render();panel.querySelector('button')?.focus({preventScroll:true});}
     else if(lastFocus?.isConnected&&lastFocus!==root)lastFocus.focus?.({preventScroll:true});
-    syncClock();
+    syncClock();if(!open)stopPageChecks();else schedulePageCheck(true);
   }
   function apply(){
     if(SIDE){
@@ -216,19 +236,19 @@
     nav.replaceChildren(...[['worlds','Worlds'],['read','Read'],['tools','Tools'],['account','Account'],['about','About']].map(([key,label])=>button(label,()=>changeTab(key),'',{'aria-pressed':String(tab===key||key==='worlds'&&['living','play'].includes(tab))})));
     body.className=tab==='worlds'?'content worldsContent':'content';body.replaceChildren();
     if(tab==='worlds')renderWorlds();else if(tab==='read')renderRead();else if(tab==='living')renderLiving();else if(tab==='play')renderPlay();else if(tab==='tools')renderTools();else if(tab==='account')renderAccount();else renderAbout();
-    syncClock();
+    syncClock();if(watchesPage())schedulePageCheck(true);else stopPageChecks();
   }
   function renderWorlds(){
-    body.append(...title('YOUR WORKSPACE','Find your world.','Choose motion, then select a world to apply both.'));
+    body.append(...title('YOUR WORKSPACE','Find your world.','Select a world. Change its motion with one click.'));
     const active=P.experience(s.prefs);
     const mode=el('select',{'aria-label':'Gallery appearance',on:{change:async e=>{await settings({mode:e.target.value},true);await checkPageExperience();}}},...[
       ['light','Light'],['dark','Dark'],['theme','Each world’s original palette'],['system','Follow system'],['chatgpt','Follow ChatGPT']
     ].map(([value,label])=>el('option',{value},label)));mode.value=s.prefs.mode;
     const appearance=field('Appearance',mode);appearance.className='field galleryAppearance';body.append(appearance);
     if(s.prefs.mode==='chatgpt')body.append(el('p',{class:'tiny'},'Cards preview the system palette; the page follows ChatGPT.'));
-    body.append(el('div',{class:'motionChoice',role:'group','aria-label':'Motion'},el('span',{class:'fieldTitle'},'Motion for your next selection'),el('div',{class:'motionOptions'},...[
+    body.append(el('div',{class:'motionChoice',role:'group','aria-label':'Motion'},el('span',{class:'fieldTitle'},'Motion for your selected world'),el('div',{class:'motionOptions'},...[
       ['still','Still'],['subtle','Subtle'],['playful','Playful']
-    ].map(([value,label])=>button(label,()=>{motionChoice=value;render();},'',{'aria-pressed':String(motionChoice===value)}))),el('div',{class:'motionMeta'},el('p',{class:'tiny'},`Applied: ${active.motion}. Select a card to change.`),el('details',{class:'motionHelp'},el('summary',{},'How motion works'),el('p',{class:'tiny'},'Still has no animation. Themes use the same gentle decoration movement for Subtle and Playful. Living Worlds and Natural Cat add idle routines in Playful. Reduced motion and reading activity can pause movement.')))));
+    ].map(([value,label])=>button(label,()=>selectExperience({motion:value}),'',{'aria-pressed':String(active.motion===value)}))),el('div',{class:'motionMeta'},el('p',{class:'tiny'},`Applied: ${active.motion}. ${active.kind==='theme'?'Subtle and Playful share gentle motion.':'Changes apply immediately.'}`),el('details',{class:'motionHelp'},el('summary',{},'How motion works'),el('p',{class:'tiny'},'Still has no animation. Themes use the same gentle decoration movement for Subtle and Playful. Living Worlds and Natural Cat add idle routines in Playful. Reduced motion and reading activity can pause movement.')))));
     body.append(el('div',{class:'experienceStatus'},el('p',{'data-page-status':'',role:'status'},pageStatusText()),button('Check display',()=>checkPageExperience(),'ghost')));
     if(['stroll','bites'].includes(s.prefs.idleMode))body.append(el('p',{class:'readingNote'},`Advanced effect selected: ${s.prefs.idleMode==='bites'?'Word Bites':'world routine'}. Choosing a world returns to its motion choice.`));
     body.append(el('div',{class:'tierTabs',role:'group','aria-label':'Theme collection'},
@@ -430,13 +450,13 @@
     updateClock();
     if(s.timerUntil>Date.now())clockTick=setTimeout(syncClock,1000);
   }
-  document.addEventListener('visibilitychange',syncClock);
-  window.addEventListener('pagehide',()=>{clearTimeout(clockTick);clockTick=null;});
-  window.addEventListener('pageshow',syncClock);
+  document.addEventListener('visibilitychange',()=>{syncClock();if(document.hidden)stopPageChecks();else schedulePageCheck(true);});
+  window.addEventListener('pagehide',()=>{pageHidden=true;clearTimeout(clockTick);clockTick=null;stopPageChecks();});
+  window.addEventListener('pageshow',()=>{pageHidden=false;syncClock();schedulePageCheck(true);});
   if(!DEMO){
     chrome.runtime.onMessage.addListener((msg,sender,respond)=>{if(sender.id===chrome.runtime.id&&msg?.scope==='mooddock'&&msg.kind==='toggle'){setOpen(!open);respond({ok:true});}});
-    window.addEventListener('focus',()=>{chrome.runtime.sendMessage({scope:'mooddock',kind:'billing-refresh'}).catch(()=>{});});
-    chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&(changes.mooddock||changes['mooddock:prefs-v2']||changes['chatdrobe:access-beta-v1']||changes['chatdrobe:billing-v1'])){const before=access.premium,source=access.accessSource,prefsBefore=JSON.stringify(s.prefs);request('read').then(data=>{s=data;apply();if(before!==access.premium||source!==access.accessSource||prefsBefore!==JSON.stringify(s.prefs)){motionChoice=P.experience(s.prefs).motion;pageStatus=null;if(['worlds','living','account','play'].includes(tab))render();}}).catch(()=>{});/* Never redraw unsaved notes, prompts or reading controls. */}});
+    window.addEventListener('focus',()=>{schedulePageCheck(true);chrome.runtime.sendMessage({scope:'mooddock',kind:'billing-refresh'}).catch(()=>{});});
+    chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&(changes.mooddock||changes['mooddock:prefs-v2']||changes['chatdrobe:access-beta-v1']||changes['chatdrobe:billing-v1'])){const before=access.premium,source=access.accessSource,prefsBefore=JSON.stringify(s.prefs);request('read').then(data=>{s=data;apply();if(before!==access.premium||source!==access.accessSource||prefsBefore!==JSON.stringify(s.prefs)){motionChoice=P.experience(s.prefs).motion;pageStatus=null;pageCheck++;if(['worlds','living','account','play'].includes(tab))render();else schedulePageCheck(true);}}).catch(()=>{});/* Never redraw unsaved notes, prompts or reading controls. */}});
   } else window.addEventListener('storage',e=>{if(e.key==='mooddock-demo'){try{s=C.state(JSON.parse(e.newValue||'{}'));apply();}catch{}}});
   try{s=await request('read');if(DEMO)desiredPrefs=s.prefs;motionChoice=P.experience(s.prefs).motion;apply();render();panel.hidden=!open;dock.hidden=open;if(DEMO)document.body.dataset.mdPanel=String(open);}
   catch(err){info(err.message,true);panel.hidden=false;dock.hidden=true;open=true;render();}

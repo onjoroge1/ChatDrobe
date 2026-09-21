@@ -28,22 +28,24 @@ class Node{
 }
 async function panel({prefs={},premium=true,diagnostics}={}){
  let state=C.state({prefs,notes:'keep local notes'}),allowed=premium,revision=1;
- const messages=[],storageListeners=[],blobs=[];
+ const messages=[],storageListeners=[],blobs=[],documentEvents={},windowEvents={},timers=new Map();let nextTimer=0;
  const html=new Node('html');html.connected=true;
- const document={documentElement:html,body:new Node('body'),hidden:false,createElement:tag=>new Node(tag),createElementNS:(_,tag)=>new Node(tag),createTextNode:text=>{const n=new Node('#text');n.textContent=text;return n;},getElementById:id=>html.querySelectorAll('[id]').find(n=>n.id===id)||null,addEventListener(){}};
+ const document={documentElement:html,body:new Node('body'),hidden:false,createElement:tag=>new Node(tag),createElementNS:(_,tag)=>new Node(tag),createTextNode:text=>{const n=new Node('#text');n.textContent=text;return n;},getElementById:id=>html.querySelectorAll('[id]').find(n=>n.id===id)||null,addEventListener:(name,fn)=>(documentEvents[name]??=[]).push(fn)};
  const effective=()=>C.state({...state,prefs:A.effective(state.prefs,{premium:allowed})});
  const response=()=>({ok:true,state:effective(),desiredPrefs:state.prefs,revision,access:{premium:allowed,testSubscription:allowed,accessSource:allowed?'test':'free'}});
  const chrome={runtime:{id:'test',getManifest:()=>({version:'0.8.0'}),onMessage:{addListener(){}},async sendMessage(message){messages.push(message);if(message.kind==='mutate'){state=C.reduce(state,message.action);revision++;}
   if(message.kind==='open-upgrade')return {ok:true};
   if(message.kind==='diagnostics')return diagnostics?.(effective(),revision)||{ok:true,experience:{...P.experience(effective().prefs),revision,state:'displayed',visible:true}};
   return response();}},storage:{onChanged:{addListener:fn=>storageListeners.push(fn)}}};
- const window={innerWidth:400,addEventListener(){},confirm:()=>true,matchMedia:()=>({matches:false})};
- const context={MoodDockCore:C,ChatDrobePrefs:P,ChatDrobeAccess:A,ChatDrobeCommerceConfig:{},MoodDockPanelCSS:'',document,window,chrome,location:{protocol:'chrome-extension:'},crypto:require('node:crypto').webcrypto,URL:class extends URL{static createObjectURL(blob){blobs.push(blob);return 'blob:test';}static revokeObjectURL(){}},Blob,setTimeout:(fn)=>setTimeout(fn,0),clearTimeout,confirm:window.confirm,navigator:{},console};
+ const window={innerWidth:400,addEventListener:(name,fn)=>(windowEvents[name]??=[]).push(fn),confirm:()=>true,matchMedia:()=>({matches:false})};
+ const timeout=(fn,delay=0)=>{if(delay<1000)return setTimeout(fn,0);const id='timer-'+(++nextTimer);timers.set(id,{fn,delay});return id;};
+ const clear=id=>{if(timers.has(id))timers.delete(id);else clearTimeout(id);};
+ const context={MoodDockCore:C,ChatDrobePrefs:P,ChatDrobeAccess:A,ChatDrobeCommerceConfig:{},MoodDockPanelCSS:'',document,window,chrome,location:{protocol:'chrome-extension:'},crypto:require('node:crypto').webcrypto,URL:class extends URL{static createObjectURL(blob){blobs.push(blob);return 'blob:test';}static revokeObjectURL(){}},Blob,setTimeout:timeout,clearTimeout:clear,confirm:window.confirm,navigator:{},console};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../extension/workspace.js'),'utf8'),context);
- const settle=async()=>{for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));};
+ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout(resolve,0));};
  await settle();const shadow=html.children.find(n=>n.id==='mooddock-root').shadowRoot;
  const find=(tag,label)=>shadow.querySelectorAll(tag).find(n=>n.getAttribute('aria-label')===label||n.textContent===label);
- return {shadow,messages,blobs,settle,state:()=>state,find,async click(label){const button=find('button',label);assert.ok(button,'Missing button: '+label);await button.click();await settle();},async change(label,value){const input=find('select',label)||find('input',label);assert.ok(input,'Missing input: '+label);input.value=value;await input.dispatch('change');await settle();},async expire(){allowed=false;revision++;for(const fn of storageListeners)fn({'mooddock:prefs-v2':{newValue:{revision,prefs:effective().prefs}}},'local');await settle();}};
+ return {shadow,messages,blobs,settle,state:()=>state,find,pendingChecks:()=>[...timers.values()].filter(t=>t.delay===3000).length,async poll(){for(const [id,timer]of [...timers])if(timer.delay===3000){timers.delete(id);await timer.fn();}await settle();},async visibility(hidden){document.hidden=hidden;for(const fn of documentEvents.visibilitychange||[])await fn();await settle();},async lifecycle(name){for(const fn of windowEvents[name]||[])await fn();await settle();},async click(label){const button=find('button',label);assert.ok(button,'Missing button: '+label);await button.click();await settle();},async change(label,value){const input=find('select',label)||find('input',label);assert.ok(input,'Missing input: '+label);input.value=value;await input.dispatch('change');await settle();},async expire(){allowed=false;revision++;for(const fn of storageListeners)fn({'mooddock:prefs-v2':{newValue:{revision,prefs:effective().prefs}}},'local');await settle();}};
 }
 
 test('one gallery switches a moving Living World to a theme and acknowledges the page',async()=>{
@@ -58,13 +60,59 @@ test('one gallery switches a moving Living World to a theme and acknowledges the
  await p.change('Gallery appearance','dark');
  assert.equal(p.find('button','Select Starlit Cat').getAttribute('data-preview-scheme'),'dark');
 });
-test('locked world selection preserves the explicit motion intent for account linking',async()=>{
+test('motion applies directly to the active world and Still stops it without selecting a card again',async()=>{
+ const p=await panel({prefs:C.selectExperience({livingWeather:'snow',livingView:'full'}, {kind:'living',id:'tokyo',motion:'still'})});
+ await p.click('Playful');
+ assert.deepEqual(P.experience(p.state().prefs),{kind:'living',id:'tokyo',motion:'playful'});
+ assert.equal(p.find('button','Playful').getAttribute('aria-pressed'),'true');
+ assert.equal(p.state().prefs.livingView,'full');
+ assert.equal(p.messages.filter(m=>m.kind==='mutate').length,1);
+ await p.click('Still');
+ assert.equal(p.state().prefs.livingEnabled,true);assert.equal(p.state().prefs.livingMotion,false);
+ assert.equal(p.find('button','Still').getAttribute('aria-pressed'),'true');
+});
+test('a motion click queued behind a new world applies to that new world',async()=>{
+ const p=await panel();
+ await Promise.all([p.click('Select Cozy Train Journey'),p.click('Subtle')]);
+ assert.deepEqual(P.experience(p.state().prefs),{kind:'living',id:'train',motion:'subtle'});
+ const mutations=p.messages.filter(m=>m.kind==='mutate');assert.equal(mutations.length,2);
+ assert.deepEqual({...mutations[1].action.value},{kind:'living',id:'train',motion:'subtle'});
+});
+test('locked motion requests account linking immediately while the control keeps showing actual applied motion',async()=>{
  const p=await panel({premium:false});await p.click('Subtle');
- assert.equal(p.messages.filter(m=>m.kind==='open-upgrade').length,0,'Choosing motion is a draft until the world is selected');
- await p.click('Connect for Starship Journey');
  const pending=p.messages.filter(m=>m.kind==='open-upgrade').at(-1);
- assert.deepEqual({...pending.target},{kind:'living',id:'starship',motion:'subtle'});
- assert.equal(p.state().prefs.livingEnabled,false);
+ assert.deepEqual({...pending.target},{kind:'theme',id:'mooncat',motion:'subtle'});
+ assert.equal(p.messages.filter(m=>m.kind==='mutate').length,0);
+ assert.equal(p.find('button','Still').getAttribute('aria-pressed'),'true');
+ assert.equal(p.state().prefs.motion,false);
+ await p.click('Connect for Starship Journey');
+ assert.deepEqual({...p.messages.filter(m=>m.kind==='open-upgrade').at(-1).target},{kind:'living',id:'starship',motion:'still'});
+});
+test('display status follows layout changes automatically and checks stop outside the visible gallery',async()=>{
+ let observed='displayed';
+ const p=await panel({prefs:C.selectExperience({}, {kind:'living',id:'tokyo',motion:'subtle'}),diagnostics:(s,revision)=>({ok:true,experience:{...P.experience(s.prefs),revision,state:observed,visible:observed==='displayed',reason:observed==='blocked'?'No clear page space.':''}})});
+ assert.match(p.shadow.querySelector('[data-page-status]').textContent,/Displayed on the active/);
+ assert.equal(p.pendingChecks(),1);
+ observed='blocked';await p.poll();assert.match(p.shadow.querySelector('[data-page-status]').textContent,/cannot be displayed.*No clear page space/);
+ assert.equal(p.pendingChecks(),1);
+ const count=p.messages.filter(m=>m.kind==='diagnostics').length;
+ await p.visibility(true);await p.poll();assert.equal(p.pendingChecks(),0);
+ assert.equal(p.messages.filter(m=>m.kind==='diagnostics').length,count);
+ observed='displayed';await p.visibility(false);assert.match(p.shadow.querySelector('[data-page-status]').textContent,/Displayed on the active/);
+ await p.click('About');assert.equal(p.pendingChecks(),0);
+ await p.click('Worlds');assert.equal(p.pendingChecks(),1);
+ await p.lifecycle('pagehide');assert.equal(p.pendingChecks(),0);
+ await p.lifecycle('pageshow');assert.equal(p.pendingChecks(),1);
+});
+test('late diagnostics cannot overwrite a hidden panel and background checks preserve foreground feedback',async()=>{
+ let deferred=null,hold=false;
+ const p=await panel({diagnostics:(s,revision)=>hold?new Promise(resolve=>{deferred=()=>resolve({ok:true,experience:{...P.experience(s.prefs),revision,state:'blocked',reason:'Old layout'}});}):{ok:true,experience:{...P.experience(s.prefs),revision,state:'displayed',visible:true}}});
+ await p.click('Check display');const status=p.shadow.querySelector('.status').textContent;
+ await p.poll();assert.equal(p.shadow.querySelector('.status').textContent,status);
+ hold=true;await p.poll();assert.ok(deferred);
+ await p.visibility(true);deferred();await p.settle();
+ assert.doesNotMatch(p.shadow.querySelector('[data-page-status]').textContent,/Old layout/);
+ assert.equal(p.pendingChecks(),0);
 });
 test('hidden paused diagnostics never claim the selected scene is visible',async()=>{
  const p=await panel({prefs:C.selectExperience({}, {kind:'living',id:'tokyo',motion:'subtle'}),diagnostics:(s,revision)=>({ok:true,experience:{...P.experience(s.prefs),revision,state:'paused',visible:false,reason:'A dialog covers the page.'}})});

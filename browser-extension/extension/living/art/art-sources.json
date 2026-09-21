@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "collection": "Tokyo planted reading nook",
+  "package": "@dicebear/styles",
+  "version": "10.6.0",
+  "repository": "https://github.com/dicebear/styles",
+  "source": "https://www.dicebear.com/styles/sprouts/",
+  "definition": "https://cdn.hopjs.net/npm/@dicebear/styles@10.6.0/dist/sprouts.min.json",
+  "definitionSha256": "f3892e7d47cd8abce9fc5b3db4f370bd8a6d6f19514d767672b943173eaadd66",
+  "creator": {
+    "name": "DiceBear",
+    "url": "https://www.dicebear.com"
+  },
+  "license": {
+    "name": "CC0 1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "text": "„Sprouts” (https://www.dicebear.com) by „DiceBear”, licensed under „CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/)"
+  },
+  "selections": [
+    {
+      "id": "window-palm",
+      "plant": "palm",
+      "pot": "cylinder"
+    },
+    {
+      "id": "desk-sprout",
+      "plant": "sprout",
+      "pot": "bowl"
+    }
+  ],
+  "changes": [
+    "Selected plant and pot components only; omitted avatar face, background and animation.",
+    "Mapped green and terracotta colors to the Tokyo day/dusk/night palette.",
+    "Prefixed every SVG ID/reference to avoid collisions.",
+    "Composed the two props in the existing Tokyo world with the original ChatDrobe cat rig."
+  ],
+  "output": "tokyo-plant-art.mjs",
+  "outputSha256": "0e0a8ffe5f3926f9d2a2c53641de83759c0398dca4751ccd55a20538da1cf73d"
+}

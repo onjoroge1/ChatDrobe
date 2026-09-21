@@ -1,0 +1,9 @@
+{
+  "name": "chatdrobe-artwork-authoring",
+  "private": true,
+  "type": "module",
+  "description": "Offline authoring only. The extension ships curated SVG data, not this generator.",
+  "engines": {"node": "22.x"},
+  "scripts": {"generate": "node generate.mjs"},
+  "devDependencies": {"@dicebear/styles": "10.6.0"}
+}

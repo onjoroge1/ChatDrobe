@@ -170,12 +170,12 @@ with sync_playwright() as p:
     panel.set_content('<!doctype html><html><body></body></html>')
     script(panel,'prefs.js');script(panel,'core.js');script(panel,'commerce-config.js');script(panel,'access.js')
     panel.add_script_tag(content="""globalThis.__CHATDROBE_SIDE_FIXTURE__=true;
-    window.fakeState=MoodDockCore.state();window.fixturePremium=false;window.openedWorld=null;const handlers=[];
+    window.fakeState=MoodDockCore.state();window.fixturePremium=false;window.fixtureDisplayState='displayed';window.openedWorld=null;const handlers=[];
     window.chrome={runtime:{id:'fixture',onMessage:{addListener:()=>{}},sendMessage:async m=>{
     if(m.kind==='open-upgrade'){window.openedWorld=m.world;return {ok:true};}
     if(m.kind==='billing-refresh'){fixturePremium=true;return {ok:true,billing:{testSubscription:true}};}
     if(m.kind==='mutate'){fakeState=MoodDockCore.reduce(fakeState,m.action);handlers.forEach(fn=>fn({mooddock:{newValue:fakeState}},'local'));}
-    if(m.kind==='diagnostics')return {ok:true,experience:{...ChatDrobePrefs.experience(fakeState.prefs),revision:0,state:'displayed',visible:true},stats:{applyCount:1,writeCount:2,extraDOMNodes:1},idle:{loaded:false}};
+    if(m.kind==='diagnostics')return {ok:true,experience:{...ChatDrobePrefs.experience(fakeState.prefs),revision:0,state:fixtureDisplayState,visible:fixtureDisplayState==='displayed'},stats:{applyCount:1,writeCount:2,extraDOMNodes:1},idle:{loaded:false}};
     if(m.kind==='idle-preview')return {ok:true};return {ok:true,state:structuredClone(fakeState),access:{premium:fixturePremium,testSubscription:fixturePremium,testerPreview:false,paid:false}};
     }},storage:{onChanged:{addListener:fn=>handlers.push(fn)}}};""")
     script(panel,'panel-style.js');script(panel,'workspace.js')
@@ -203,11 +203,20 @@ with sync_playwright() as p:
     expect(panel.get_by_role('button',name='Select Starlit Cat')).to_have_attribute('aria-pressed','true')
     passed('Simulated verified subscription unlocks Premium themes, scenes and companion; no tester control exists')
     panel.get_by_role('button',name='Subtle',exact=True).click()
+    expect(panel.get_by_role('button',name='Subtle',exact=True)).to_have_attribute('aria-pressed','true')
+    assert panel.evaluate('fakeState.prefs.motion && fakeState.prefs.theme==="starlit"'), 'Motion should immediately apply to the active world'
     panel.get_by_role('button',name='Select Starship Journey',exact=True).click()
     panel.wait_for_timeout(100)
     assert panel.evaluate('fakeState.prefs.livingEnabled && fakeState.prefs.livingMotion')
     assert panel.evaluate('fakeState.prefs.livingBehavior')=='subtle'
     expect(panel.locator('[data-page-status]')).to_contain_text('Displayed on the active ChatGPT tab')
+    panel.get_by_role('button',name='Still',exact=True).click()
+    expect(panel.get_by_role('button',name='Still',exact=True)).to_have_attribute('aria-pressed','true')
+    assert panel.evaluate('fakeState.prefs.livingEnabled && !fakeState.prefs.livingMotion'), 'Still stops current-world motion without reselecting its card'
+    panel.evaluate('fixtureDisplayState="blocked"')
+    expect(panel.locator('[data-page-status]')).to_contain_text('cannot be displayed here',timeout=4500)
+    passed('Motion applies in one click and display status updates automatically after a layout-state change')
+    panel.evaluate('fixtureDisplayState="displayed"')
     panel.get_by_role('button',name='All worlds',exact=True).click()
     panel.get_by_role('button',name='Select Mooncat Café',exact=True).click()
     panel.wait_for_timeout(100)

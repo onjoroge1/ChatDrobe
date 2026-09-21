@@ -4,15 +4,16 @@ import {createQuietPolicy} from './quiet-policy.mjs';
 /* One inert Shadow DOM scene, clipped out of the reading/composer band. No text sampling. */
 export function createEnvironment(doc,win){
  let prefs=null,opts=settings(),world=worldById('tokyo'),session=null,sessionKey='',host=null,scene=null,shadow=null;
- let ui=state(),disposed=false,boundary=null,idleTimer=null,observer=null,resize=null,raf=null;
+ let ui=state(),disposed=false,boundary=null,idleTimer=null,observer=null,geometryObserver=null,resize=null,raf=null;
  let lastInput=Date.now(),nativeStreaming=false,bindings=false,lastConfig='',paintKey='',lastLayout=null,dialogBlocked=false;
- let observedComposer=null,composing=false,selectionActive=false,mediaBusy=false;
+ let observedComposer=null,composing=false,selectionActive=false,mediaBusy=false,remeasuring=false,resizeNodes=new Set();
  const quiet=createQuietPolicy({now:()=>win.performance.now(),setTimer:(fn,ms)=>win.setTimeout(fn,ms),clearTimer:id=>win.clearTimeout(id),onChange:()=>paint()});
  const reduced=win.matchMedia('(prefers-reduced-motion: reduce)');
+ const motionEvents=['animationstart','animationend','animationcancel','transitionrun','transitionend','transitioncancel'];
  const metrics={mounts:0,paints:0,events:0,geometryChecks:0};
  const active=()=>!doc.hidden&&doc.hasFocus();
  const composerElement=()=>doc.querySelector('#composer-background')||doc.querySelector('form:has(#prompt-textarea)')||doc.querySelector('#thread-bottom-container');
- function syncQuiet(){quiet.configure({enabled:opts.motion&&!reduced.matches,active:active()&&!!host&&!host.hidden,quiet:composing||selectionActive||mediaBusy||nativeStreaming||(opts.quietFocus&&ui.focused),world:world.id,behavior:prefs?.livingBehavior});}
+ function syncQuiet(){quiet.configure({enabled:opts.motion&&!reduced.matches,active:active()&&!!host&&lastLayout?.visible===true&&!dialogBlocked,quiet:composing||selectionActive||mediaBusy||nativeStreaming||(opts.quietFocus&&ui.focused),world:world.id,behavior:prefs?.livingBehavior});}
  function emit(event){ui=react(world,ui,event);metrics.events++;syncQuiet();paint();}
  function mount(){
   if(host||!doc.body)return;
@@ -20,26 +21,60 @@ export function createEnvironment(doc,win){
   host.style.cssText='position:fixed;z-index:2;pointer-events:none!important;user-select:none!important;overflow:hidden;contain:layout style paint;';
   shadow=host.attachShadow({mode:'open'});const style=new win.CSSStyleSheet();style.replaceSync(SCENE_CSS);shadow.adoptedStyleSheets=[style];
   scene=createScene(doc,world);if(prefs?.livingCompanionOnly)scene.setCompanionOnly?.();shadow.append(scene.element);doc.body.append(host);metrics.mounts++;
-  if(typeof win.ResizeObserver==='function'){resize=new win.ResizeObserver(scheduleGeometry);const main=doc.querySelector('main');if(main)resize.observe(main);const form=composerElement();if(form)resize.observe(form);}
+  if(typeof win.ResizeObserver==='function')resize=new win.ResizeObserver(scheduleGeometry);
+  // Observe native layout changes only. The scene is outside main and its own
+  // style writes are excluded, so geometry checks cannot feed an observer loop.
+  geometryObserver=new win.MutationObserver(records=>{if(records.some(r=>r.target!==host&&!host?.contains?.(r.target)))scheduleGeometry();});
+  geometryObserver.observe(doc.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','open','aria-hidden','aria-expanded','aria-modal']});
   layout(); // No cinematic entrance while using a productive workspace.
  }
- function unmount(){scene?.dispose?.();resize?.disconnect();resize=null;host?.getAnimations().forEach(a=>a.cancel());host?.remove();host=scene=shadow=null;paintKey='';}
+ function unmount(){scene?.dispose?.();resize?.disconnect();resize=null;resizeNodes.clear();geometryObserver?.disconnect();geometryObserver=null;host?.getAnimations().forEach(a=>a.cancel());host?.remove();host=scene=shadow=null;paintKey='';remeasuring=false;}
  function modalOpen(){return [...doc.querySelectorAll('[role="dialog"][aria-modal="true"]:not([hidden]),dialog[open]')].slice(0,10).some(n=>n.getClientRects().length>0);}
- function readingBounds(){
+ function conversationGeometry(){
   // Union geometry across the conversation, never paragraph contents or just one message.
   const nodes=doc.querySelectorAll('main .markdown,main [data-message-author-role]');
-  if(!nodes.length||nodes.length>200)return null; // Fall back to the conservative width guard.
-  let left=Infinity,right=-Infinity;
-  for(const node of nodes){const r=node.getBoundingClientRect();if(r.width>0){left=Math.min(left,r.left);right=Math.max(right,r.right);}}
-  return right>left?{left,right,width:right-left}:null;
+  if(!nodes.length||nodes.length>200)return {bounds:null,nodes:[],messages:[]}; // Fall back to the conservative width guard.
+  let left=Infinity,right=-Infinity;const messages=[];
+  for(const node of nodes){const r=node.getBoundingClientRect();if(r.width>0){left=Math.min(left,r.left);right=Math.max(right,r.right);messages.push(r);}}
+  return {bounds:right>left?{left,right,width:right-left}:null,nodes:[...nodes],messages};
+ }
+ function nativeControls(){
+  const nodes=doc.querySelectorAll('button,a,input,textarea,[contenteditable="true"],[role="button"],[role="menu"],[role="listbox"],nav,header,aside');
+  if(nodes.length>300)return null;
+  return {nodes:[...nodes],rects:[...nodes].map(node=>node.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0)};
+ }
+ function ownGeometry(target){return target===host||!!host?.contains?.(target)||target?.getRootNode?.()?.host===host;}
+ function relatedGeometry(target,nodes){return !!target&&!ownGeometry(target)&&nodes.some(node=>node===target||target.contains?.(node)||node.contains?.(target));}
+ function nativeLayoutMoving(nodes){
+  // A transform does not resize its element. Keep fallback art hidden throughout
+  // native transitions/animations, including ones already running when enabled.
+  // Without animation inspection, a clear band cannot be certified safely.
+  if(typeof doc.getAnimations!=='function')return true;
+  try{const animations=doc.getAnimations();if(animations.length>300)return true;
+   return animations.some(a=>(a.playState==='running'||a.pending)&&(!a.effect?.target||relatedGeometry(a.effect.target,nodes)));
+  }catch{return true;}
+ }
+ function nativeMotionChanged(event){if(relatedGeometry(event.target,[...resizeNodes]))scheduleGeometry();}
+ function observeGeometry(nodes){
+  if(!resize)return;const next=new Set(nodes.filter(Boolean));
+  for(const node of resizeNodes)if(!next.has(node))resize.unobserve?.(node);
+  for(const node of next)if(!resizeNodes.has(node))resize.observe(node);
+  resizeNodes=next;
  }
  function layout(){
-  if(raf!==null)win.cancelAnimationFrame(raf);raf=null;if(!host)return;metrics.geometryChecks++;
+  if(raf!==null)win.cancelAnimationFrame(raf);raf=null;remeasuring=false;if(!host)return;metrics.geometryChecks++;
   const c=doc.querySelector('#thread-bottom-container')||doc.querySelector('form:has(#prompt-textarea)');if(c!==observedComposer)bindReactions();
   const main=doc.querySelector('main');const form=composerElement();
   const m=main?.getBoundingClientRect(),f=form?.getBoundingClientRect();
-  const reading=readingBounds();
-  const p=placement(m,f,prefs.width,opts.view,{width:win.innerWidth,height:win.innerHeight},reading);
+  const reading=conversationGeometry(),geometryNodes=[main,form,...reading.nodes].filter(Boolean);
+  const viewport={width:win.innerWidth,height:win.innerHeight};
+  let p=placement(m,f,prefs.width,opts.view,viewport,reading.bounds);
+  if(!p.visible){
+   const controls=nativeControls();if(controls)geometryNodes.push(...controls.nodes);
+   p=placement(m,f,prefs.width,opts.view,viewport,reading.bounds,{messages:reading.messages,controls:controls?.rects});
+   if(p.visible&&nativeLayoutMoving(geometryNodes))p={...p,visible:false,moving:true,reason:'World paused while the ChatGPT layout is moving.',action:'The world returns automatically when the page settles.'};
+  }
+  observeGeometry(geometryNodes);
   const blocked=modalOpen();lastLayout=p;dialogBlocked=blocked;host.hidden=!p.visible||blocked;
   if(!p.visible||blocked){syncQuiet();paint();return;}
   Object.assign(host.style,{left:p.left+'px',top:p.top+'px',width:p.width+'px',height:p.height+'px',borderRadius:p.view==='portal'?'18px':'0',boxShadow:p.view==='portal'&&!prefs?.livingCompanionOnly?'0 10px 35px #16273822':'none'});
@@ -47,9 +82,16 @@ export function createEnvironment(doc,win){
   host.style.maskImage=p.view==='full'?`linear-gradient(to right,#000 0px,#000 ${p.cutLeft}px,transparent ${p.cutLeft}px,transparent ${p.cutRight}px,#000 ${p.cutRight}px,#000 100%)`:'none';
   syncQuiet();paint();
  }
- function scheduleGeometry(){if(raf===null&&!doc.hidden)raf=win.requestAnimationFrame(layout);}
+ function scheduleGeometry(){
+  // A previously empty band may now contain scrolled or growing content. Hide it
+  // immediately, before measuring the next frame; no stale art over a response.
+  // Hide for this provisional measurement without restarting in-flight clips or
+  // the quiet clock. Only measured visibility loss pauses policy and renderer.
+  if(lastLayout?.fallback&&host&&!host.hidden){remeasuring=true;host.hidden=true;}
+  if(raf===null&&!doc.hidden)raf=win.requestAnimationFrame(layout);
+ }
  function paint(){
-  if(!scene)return;
+  if(!scene||remeasuring)return;
   const q=quiet.snapshot(),stage=stageFor(world,session),s={busy:q.busy||composing||selectionActive||mediaBusy||nativeStreaming,pose:q.pose,poseSerial:q.serial,idleStage:q.stage,world:world.id,light:sceneLighting(opts.time,stage,world.stages.length),weather:opts.weather,motion:opts.motion&&!reduced.matches,active:active()&&!host.hidden,quiet:opts.quietFocus,stage,label:world.stages[stage],...ui};
   const key=JSON.stringify(s);if(key===paintKey)return;paintKey=key;scene.update(s);metrics.paints++;
  }
@@ -93,16 +135,16 @@ export function createEnvironment(doc,win){
  function lifecycle(){
   clearTimeout(boundary);boundary=null;clearTimeout(idleTimer);idleTimer=null;
   if(raf!==null){win.cancelAnimationFrame(raf);raf=null;}
-  if(!active()){syncQuiet();host?.getAnimations().forEach(a=>a.cancel());paint();return;}
+  if(!active()){remeasuring=false;syncQuiet();host?.getAnimations().forEach(a=>a.cancel());paint();return;}
   lastInput=Date.now();if(opts.reactions&&ui.idle)emit('USER_RETURNED');syncQuiet();layout();tick();armIdle();
  }
- function install(){if(bindings)return;bindings=true;for(const name of ['play','pause','ended'])doc.addEventListener(name,mediaChanged,true);mediaChanged();doc.addEventListener('visibilitychange',lifecycle);doc.addEventListener('selectionchange',selectionChanged);doc.addEventListener('compositionstart',composingStart,true);doc.addEventListener('compositionend',composingEnd,true);win.addEventListener('focus',lifecycle);win.addEventListener('blur',lifecycle);win.addEventListener('resize',scheduleGeometry);win.addEventListener('popstate',scheduleGeometry);doc.addEventListener('click',onClick,true);doc.addEventListener('submit',onSubmit,true);doc.addEventListener('DOMContentLoaded',ready,{once:true});reduced.addEventListener('change',lifecycle);}
+ function install(){if(bindings)return;bindings=true;for(const name of motionEvents)doc.addEventListener(name,nativeMotionChanged,true);for(const name of ['play','pause','ended'])doc.addEventListener(name,mediaChanged,true);mediaChanged();doc.addEventListener('visibilitychange',lifecycle);doc.addEventListener('selectionchange',selectionChanged);doc.addEventListener('compositionstart',composingStart,true);doc.addEventListener('compositionend',composingEnd,true);win.addEventListener('focus',lifecycle);win.addEventListener('blur',lifecycle);win.addEventListener('resize',scheduleGeometry);win.addEventListener('scroll',scheduleGeometry,{capture:true,passive:true});win.addEventListener('popstate',scheduleGeometry);doc.addEventListener('click',onClick,true);doc.addEventListener('submit',onSubmit,true);doc.addEventListener('DOMContentLoaded',ready,{once:true});reduced.addEventListener('change',lifecycle);}
  function ready(){if(disposed||!prefs?.enabled||!prefs.livingEnabled)return;mount();bindReactions();tick();}
  function clear(){
   clearTimeout(boundary);boundary=null;clearTimeout(idleTimer);idleTimer=null;observer?.disconnect();observer=null;
   if(raf!==null){win.cancelAnimationFrame(raf);raf=null;}
   for(const name of ['pointermove','keydown','pointerdown','scroll'])win.removeEventListener(name,activity,true);
-  if(bindings){for(const name of ['play','pause','ended'])doc.removeEventListener(name,mediaChanged,true);doc.removeEventListener('visibilitychange',lifecycle);doc.removeEventListener('selectionchange',selectionChanged);doc.removeEventListener('compositionstart',composingStart,true);doc.removeEventListener('compositionend',composingEnd,true);win.removeEventListener('focus',lifecycle);win.removeEventListener('blur',lifecycle);win.removeEventListener('resize',scheduleGeometry);win.removeEventListener('popstate',scheduleGeometry);doc.removeEventListener('click',onClick,true);doc.removeEventListener('submit',onSubmit,true);doc.removeEventListener('DOMContentLoaded',ready);reduced.removeEventListener('change',lifecycle);bindings=false;}
+  if(bindings){for(const name of motionEvents)doc.removeEventListener(name,nativeMotionChanged,true);for(const name of ['play','pause','ended'])doc.removeEventListener(name,mediaChanged,true);doc.removeEventListener('visibilitychange',lifecycle);doc.removeEventListener('selectionchange',selectionChanged);doc.removeEventListener('compositionstart',composingStart,true);doc.removeEventListener('compositionend',composingEnd,true);win.removeEventListener('focus',lifecycle);win.removeEventListener('blur',lifecycle);win.removeEventListener('resize',scheduleGeometry);win.removeEventListener('scroll',scheduleGeometry,true);win.removeEventListener('popstate',scheduleGeometry);doc.removeEventListener('click',onClick,true);doc.removeEventListener('submit',onSubmit,true);doc.removeEventListener('DOMContentLoaded',ready);reduced.removeEventListener('change',lifecycle);bindings=false;}
   quiet.configure({enabled:false});composing=false;selectionActive=false;mediaBusy=false;nativeStreaming=false;unmount();lastLayout=null;dialogBlocked=false;lastConfig='';
  }
  return {configure(p,snapshot=null){
