@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import threading
+import time
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 
@@ -23,6 +24,17 @@ threading.Thread(target=server.serve_forever,daemon=True).start()
 origin=f'http://127.0.0.1:{server.server_port}'
 checks=[]
 def passed(message):checks.append(message);print('PASS:',message,flush=True)
+def wait_until(page,predicate,description,timeout_ms=10000):
+    """Poll from the test process: page-side wait_for_function compiles strings with eval.
+
+    Direct DevTools evaluation is supported under CSP; an in-page polling function
+    calling eval is not. Keep the page's actual script-src self policy intact.
+    """
+    deadline=time.monotonic()+timeout_ms/1000
+    while time.monotonic()<deadline:
+        if predicate():return
+        page.wait_for_timeout(50)
+    raise AssertionError('Timed out waiting for '+description)
 try:
     with sync_playwright() as p:
         options={'headless':True,'args':['--no-sandbox']}
@@ -34,13 +46,13 @@ try:
         page.on('pageerror',lambda error:errors.append(str(error)))
         page.on('request',lambda request:requests.append(request.url))
         page.goto(origin+'/tests/lottie-fixture.html')
-        page.wait_for_function('window.pilot !== undefined')
+        wait_until(page,lambda:page.evaluate('() => window.pilot !== undefined'),'fixture module readiness')
         assert not any('lottie-light-5.13.0' in url for url in requests)
         expect(page.locator('#fallback')).to_be_visible()
         passed('Still uses the existing SVG without downloading or parsing the player')
         page.evaluate('''()=>{window.pilotRafCallbacks=0;const raf=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=callback=>raf(time=>{window.pilotRafCallbacks++;callback(time);});}''')
         page.get_by_role('button',name='Play',exact=True).click()
-        page.wait_for_function('pilot.diagnostics().loaded && pilot.diagnostics().frame >= 5')
+        wait_until(page,lambda:page.evaluate('() => pilot.diagnostics().loaded && pilot.diagnostics().frame >= 5'),'loaded player reaching frame 5')
         expect(page.locator('#animation svg')).to_have_count(1)
         assert page.locator('#animation path').count()==2
         assert page.evaluate('pilot.diagnostics().playing')
@@ -54,19 +66,19 @@ try:
             frame=page.evaluate('pilot.diagnostics().frame');page.wait_for_timeout(180)
             assert page.evaluate('pilot.diagnostics().frame')==frame
             page.evaluate('updatePilot({motion:true,active:true,busy:false,streaming:false,focused:false,quiet:false,pose:"rest"})')
-            page.wait_for_function('frame=>pilot.diagnostics().frame !== frame',arg=frame)
+            wait_until(page,lambda:page.evaluate('frame => pilot.diagnostics().frame !== frame',frame),'frame advance after resume')
         page.emulate_media(reduced_motion='reduce')
         assert not page.evaluate('pilot.diagnostics().playing')
         frame=page.evaluate('pilot.diagnostics().frame');page.wait_for_timeout(180)
         assert page.evaluate('pilot.diagnostics().frame')==frame
         page.emulate_media(reduced_motion='no-preference')
-        page.wait_for_function('pilot.diagnostics().playing')
+        wait_until(page,lambda:page.evaluate('() => pilot.diagnostics().playing'),'resume after reduced motion')
         page.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
         assert not page.evaluate('pilot.diagnostics().playing')
         frame=page.evaluate('pilot.diagnostics().frame');page.wait_for_timeout(180)
         assert page.evaluate('pilot.diagnostics().frame')==frame
         page.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'))")
-        page.wait_for_function('pilot.diagnostics().playing')
+        wait_until(page,lambda:page.evaluate('() => pilot.diagnostics().playing'),'resume after visibility restoration')
         assert sum('lottie-light-5.13.0' in url for url in requests)==1
         passed('Busy/streaming/Quiet Focus/Still/sleep/inactive/reduced-motion/hidden states freeze frames and resume the same player')
         session=page.context.new_cdp_session(page)
@@ -97,7 +109,7 @@ try:
         failure.route('**/lottie-light-5.13.0.mjs',lambda route:route.abort())
         failure.goto(origin+'/tests/lottie-fixture.html')
         failure.get_by_role('button',name='Play',exact=True).click()
-        failure.wait_for_function('pilot.diagnostics().failed')
+        wait_until(failure,lambda:failure.evaluate('() => pilot.diagnostics().failed'),'graceful blocked-import failure')
         expect(failure.locator('#fallback')).to_be_visible()
         expect(failure.locator('#animation svg')).to_have_count(0)
         passed('Blocked runtime import leaves original artwork visible without an unhandled error')
