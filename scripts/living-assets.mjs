@@ -1,16 +1,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {SCENE_CSS} from '../src/living-runtime/scene.mjs';
-/** Publish the v0.5.1 renderer without the page adapter, timer worker, or duplicate CSS string. */
+import {SCENE_CSS} from '../browser-extension/extension/living/quiet-scene.mjs';
+
+/** Publish only the shared scene vocabulary; the page adapter and access worker stay in the extension. */
 export function writeLivingAssets(root,assets){
- const source=fs.readFileSync(path.join(root,'src/living-runtime/scene.mjs'),'utf8');
- const start=source.indexOf('export const SCENE_CSS=`'),end=source.indexOf('export function createScene');
+ const release=JSON.parse(fs.readFileSync(path.join(root,'release.json'),'utf8'));
+ const sourceRoot=path.join(root,release.extension.source,'living');
+ const read=name=>fs.readFileSync(path.join(sourceRoot,name),'utf8');
+ const base=read('scene.mjs'),start=base.indexOf('export const SCENE_CSS=`'),end=base.indexOf('export function createScene');
  if(start<0||end<=start)throw new Error('Review the changed scene module before bundling.');
- const renderer=(source.slice(0,start)+source.slice(end)).replace("from './model.mjs'","from './living-model.js'");
+ const baseRenderer=(base.slice(0,start)+base.slice(end)).replace("from './model.mjs'","from './living-model.js'");
+ const quiet=read('quiet-scene.mjs'),quietStart=quiet.indexOf('export const QUIET_CSS=`'),quietEnd=quiet.indexOf("const DETAIL_NS=");
+ if(quietStart<0||quietEnd<=quietStart)throw new Error('Review the changed quiet-scene module before bundling.');
+ const renderer=(quiet.slice(0,quietStart)+quiet.slice(quietEnd))
+  .replace("import {createScene as baseScene,SCENE_CSS as BASE_CSS} from './scene.mjs';","import {createScene as baseScene} from './living-base.js';")
+  .replaceAll("'./companion-rig.mjs'","'./living-companion-rig.js'")
+  .replaceAll("'./companion-motion.mjs'","'./living-companion-motion.js'");
  fs.mkdirSync(assets,{recursive:true});
- fs.writeFileSync(path.join(assets,'living-renderer.js'),renderer);
- fs.copyFileSync(path.join(root,'src/living-runtime/model.mjs'),path.join(assets,'living-model.js'));
+ for(const[name,source]of Object.entries({
+  'living-base.js':baseRenderer,
+  'living-renderer.js':renderer,
+  'living-model.js':read('model.mjs'),
+  'living-companion-rig.js':read('companion-rig.mjs').replaceAll("'./companion-motion.mjs'","'./living-companion-motion.js'"),
+  'living-companion-motion.js':read('companion-motion.mjs')
+ }))fs.writeFileSync(path.join(assets,name),source);
  fs.copyFileSync(path.join(root,'src/living-tour.mjs'),path.join(assets,'living-tour.js'));
- // An external Shadow DOM stylesheet keeps the existing no-inline-script/style policy intact.
+ // The stylesheet is external to preserve the website's no-inline-style policy.
  fs.writeFileSync(path.join(assets,'living-runtime.css'),SCENE_CSS+'\n.caption{display:none}.room{border-radius:inherit}\n');
 }

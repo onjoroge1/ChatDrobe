@@ -1,0 +1,14 @@
+{
+  "name": "chatdrobe-extension",
+  "version": "0.8.0",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.cjs",
+    "check": "npm run build && npm test",
+    "browser-test": "python tests/browser.py"
+  }
+}

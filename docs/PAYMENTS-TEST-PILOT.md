@@ -2,6 +2,8 @@
 
 Date: 2026-09-14. New-world and Gemini development are paused until checkout, extension cleanup and launch gates are complete.
 
+Historical pilot design. For the integrated extension's current retry, expiry and request-limit repairs, see [Billing and extension access reliability](BILLING-RELIABILITY.md). The original extension-integration and card-only statements below describe the earlier milestone.
+
 ## What this code adds
 
 A disabled-by-default Vercel Node endpoint at `/api/billing`, a PostgreSQL store/migration, a version-pinned Stripe REST client, signed short-lived access leases and a browser-safe verification contract. This is backend and contract code, **not yet an updated extension runtime**. The website engine, marketing/showcase and existing ZIP are unchanged. No live payment can be created by this implementation.

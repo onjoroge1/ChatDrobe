@@ -1,0 +1,116 @@
+/* Narrow, reversible presentation overrides. Never remove ChatGPT's dark class. */
+html[data-md-enabled="true"]{
+ color-scheme:var(--md-color-scheme)!important;
+ --main-surface-primary:var(--md-bg)!important;--main-surface-secondary:var(--md-surface)!important;--main-surface-tertiary:var(--md-soft)!important;
+ --sidebar-surface-primary:var(--md-panel)!important;--sidebar-surface-secondary:var(--md-soft)!important;--sidebar-surface-tertiary:var(--md-surface)!important;
+ --bg-primary:var(--md-bg)!important;--bg-secondary:var(--md-surface)!important;--bg-tertiary:var(--md-soft)!important;--bg-elevated-primary:var(--md-surface)!important;--bg-elevated-secondary:var(--md-panel)!important;
+ --text-primary:var(--md-text)!important;--text-secondary:var(--md-muted)!important;--text-tertiary:var(--md-muted)!important;--text-quaternary:var(--md-muted)!important;--text-inverted:var(--md-button-ink)!important;--icon-primary:var(--md-text)!important;--icon-secondary:var(--md-muted)!important;
+ --border-light:var(--md-line)!important;--border-medium:var(--md-line)!important;--border-heavy:var(--md-muted)!important;--border-default:var(--md-line)!important;
+ --message-surface:var(--md-soft)!important;--composer-surface:var(--md-surface)!important;--composer-background:var(--md-surface)!important;
+ --link:var(--md-link)!important;--link-hover:var(--md-link)!important;--text-link:var(--md-link)!important;
+ --thread-content-max-width:var(--md-width,850px)!important;--user-chat-width:var(--md-width,850px)!important;
+}
+html[data-md-enabled="true"] :is(body,main){background-color:var(--md-bg)!important;color:var(--md-text)!important;}
+html[data-md-enabled="true"] :is(#stage-slideover-sidebar,#stage-sidebar-tiny-bar,nav[aria-label="Chat history"],[data-md-fixture-sidebar]){background:var(--md-panel)!important;color:var(--md-text)!important;}
+html[data-md-enabled="true"] :is([data-message-author-role],#prompt-textarea){font-family:var(--md-font,system-ui)!important;font-size:var(--md-font-size,16px)!important;line-height:var(--md-line-height,1.65)!important;color:var(--md-text)!important;}
+html[data-md-enabled="true"] [data-message-author-role] .markdown{
+ --tw-prose-body:var(--md-text)!important;--tw-prose-headings:var(--md-text)!important;--tw-prose-bold:var(--md-text)!important;--tw-prose-links:var(--md-link)!important;--tw-prose-code:var(--md-text)!important;--tw-prose-pre-code:var(--md-text)!important;--tw-prose-pre-bg:var(--md-panel)!important;
+ --tw-prose-invert-body:var(--md-text)!important;--tw-prose-invert-headings:var(--md-text)!important;--tw-prose-invert-bold:var(--md-text)!important;--tw-prose-invert-code:var(--md-text)!important;--tw-prose-invert-links:var(--md-link)!important;
+ color:var(--md-text)!important;font-family:inherit!important;font-size:inherit!important;line-height:inherit!important;
+}
+html[data-md-enabled="true"] [data-message-author-role] .markdown :is(p,li,strong,b,em,h1,h2,h3,h4,h5,h6,th,td,blockquote){color:var(--md-text)!important;}
+html[data-md-enabled="true"] [data-md-fixture-thread]{max-width:var(--md-width,850px)!important;}
+html[data-md-enabled="true"] [data-message-author-role] a{color:var(--md-link)!important;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;}
+html[data-md-enabled="true"] [data-message-author-role] .markdown a :is(strong,b,em){color:inherit!important;}
+html[data-md-enabled="true"] [data-message-author-role] a:hover{text-decoration-thickness:2px;}
+/* Inline variables are not dark-mode code blocks. */
+html[data-md-enabled="true"] [data-message-author-role] code:not(pre code){background:var(--md-soft)!important;color:var(--md-text)!important;border:1px solid var(--md-line);border-radius:5px;padding:.08em .28em;box-decoration-break:clone;font-size:.9em;white-space:break-spaces;overflow-wrap:anywhere;}
+html[data-md-enabled="true"] [data-message-author-role] code:not(pre code)::before,html[data-md-enabled="true"] [data-message-author-role] code:not(pre code)::after{content:none!important;}
+html[data-md-enabled="true"] [data-message-author-role] :is(pre,code){font-family:ui-monospace,SFMono-Regular,Consolas,monospace!important;}
+html[data-md-enabled="true"] [data-message-author-role] pre{background:var(--md-panel)!important;border:1px solid var(--md-line);border-radius:12px;color:var(--md-text)!important;overflow:auto;padding:12px 14px;}
+html[data-md-enabled="true"] [data-message-author-role] pre :is(code,code span){background-color:transparent!important;color:var(--md-text)!important;}
+html[data-md-enabled="true"] [data-message-author-role] pre :is(.token.keyword,.token.string,.hljs-keyword,.hljs-string){color:var(--md-link)!important;}
+html[data-md-enabled="true"] [data-message-author-role] pre :is(.token.comment,.hljs-comment){color:var(--md-muted)!important;}
+/* Code toolbars and source/citation pills need their own surface + foreground pair. */
+html[data-md-enabled="true"] [data-message-author-role] :is(pre>div,[data-testid="code-block-toolbar"],[class*="code-block"] header){background:var(--md-panel)!important;color:var(--md-muted)!important;}
+html[data-md-enabled="true"] [data-message-author-role] :is(a[data-testid*="citation"],button[data-testid*="citation"],.citation,[data-state]a.rounded-full){background:var(--md-soft)!important;color:var(--md-text)!important;border-color:var(--md-line)!important;box-shadow:none!important;}
+/* Paint the actual user bubble, not an additional oversized message wrapper. */
+html[data-md-enabled="true"] [data-message-author-role="user"]{color:var(--md-text)!important;}
+html[data-md-enabled="true"] [data-message-author-role="user"] :is(.user-message-bubble-color,.bg-token-message-surface,[class~="bg-token-bg-secondary"]){background:var(--md-soft)!important;color:var(--md-text)!important;border:1px solid var(--md-line);}
+html[data-md-enabled="true"][data-md-bubbles="true"] [data-message-author-role="user"]:not(:has(.user-message-bubble-color,.bg-token-message-surface,[class~="bg-token-bg-secondary"])){background:var(--md-soft)!important;border:1px solid var(--md-line);border-radius:18px;padding:12px 16px;}
+html[data-md-enabled="true"][data-md-bubbles="false"] [data-message-author-role="user"] :is(.user-message-bubble-color,.bg-token-message-surface,[class~="bg-token-bg-secondary"]){background:transparent!important;border-color:transparent;}
+/* Composer stays in native flow. Center within the conversation column, not the full window.
+   Never apply transcript-width limits indiscriminately to every token-named ancestor. */
+html[data-md-enabled="true"] :is(#thread-bottom-container,#thread-bottom){
+ background:var(--md-bg)!important;background-image:none!important;
+}
+html[data-md-enabled="true"] :is(#thread-bottom-container,#thread-bottom) :is(#composer-background,[class*="thread-content-max-width"],[class~="mx-auto"]):has(form #prompt-textarea){
+ width:100%!important;max-width:100%!important;min-width:0!important;margin-inline:auto!important;box-sizing:border-box!important;
+}
+html[data-md-enabled="true"] form:has(#prompt-textarea){
+ box-sizing:border-box!important;width:calc(100% - 24px)!important;max-width:var(--md-width,850px)!important;min-width:0!important;
+ margin-inline:auto!important;align-self:center!important;justify-self:center!important;
+ background:var(--md-surface)!important;color:var(--md-text)!important;
+ border:1px solid color-mix(in srgb,var(--md-accent) 60%,var(--md-line))!important;border-radius:24px!important;
+ box-shadow:0 8px 24px #0000001f,0 0 0 1px color-mix(in srgb,var(--md-accent) 12%,transparent)!important;
+ isolation:isolate;
+}
+html[data-md-enabled="true"][data-md-scheme="dark"] form:has(#prompt-textarea){
+ background:color-mix(in srgb,var(--md-surface) 92%,white)!important;
+ box-shadow:0 10px 28px #00000055,0 0 0 1px color-mix(in srgb,var(--md-accent) 14%,transparent)!important;
+}
+html[data-md-enabled="true"] form:has(#prompt-textarea):focus-within{
+ outline:2px solid var(--md-accent)!important;outline-offset:2px!important;
+}
+html[data-md-enabled="true"] form:has(#prompt-textarea) :is(#composer-background,[data-testid="composer"],.bg-token-bg-primary,.bg-token-bg-secondary,.bg-token-main-surface-primary,.bg-token-main-surface-secondary,[data-type="unified-composer"]){
+ background:transparent!important;color:var(--md-text)!important;box-shadow:none!important;
+}
+html[data-md-enabled="true"] :is(#composer-background,[data-testid="composer"]){border-radius:23px;border-color:transparent!important;background:transparent!important;box-shadow:none!important;}
+html[data-md-enabled="true"] :is(#thread-bottom-container,#thread-bottom)::before,
+html[data-md-enabled="true"] :is(#thread-bottom-container,#thread-bottom)::after{
+ background:transparent!important;background-image:none!important;box-shadow:none!important;pointer-events:none!important;
+}
+html[data-md-enabled="true"] #prompt-textarea{background:transparent!important;caret-color:var(--md-accent)!important;color:var(--md-text)!important;}
+html[data-md-enabled="true"] #prompt-textarea :is(p,span){color:inherit!important;}
+html[data-md-enabled="true"] #prompt-textarea::placeholder,
+html[data-md-enabled="true"] #prompt-textarea [data-placeholder]::before{color:var(--md-muted)!important;opacity:1!important;}
+html[data-md-enabled="true"] form:has(#prompt-textarea) button{color:var(--md-text)!important;}
+html[data-md-enabled="true"] form:has(#prompt-textarea) :is(button[data-testid="send-button"],button[data-testid="stop-button"],button[aria-label="Send prompt"]){background:var(--md-accent)!important;color:var(--md-button-ink)!important;}
+html[data-md-enabled="true"] form:has(#prompt-textarea) button:disabled{opacity:.5!important;}
+/* Keep the real warning and its links; no replacement, concealment or duplicate disclaimer.
+   Scoped to footer labels outside the form, so attachment captions remain native. */
+html[data-md-enabled="true"] :is(#thread-bottom-container,#thread-bottom) :is([data-testid="composer-footer"],[data-testid="chat-disclaimer"],.text-token-text-secondary):not(form *){
+ color:var(--md-muted)!important;background:transparent!important;background-image:none!important;
+ box-shadow:none!important;text-shadow:none!important;filter:none!important;backdrop-filter:none!important;
+ position:static!important;transform:none!important;inset:auto!important;opacity:1!important;visibility:visible!important;
+ text-align:center!important;font:400 12px/1.5 system-ui,sans-serif!important;
+ white-space:normal!important;width:auto!important;max-width:var(--md-width,850px)!important;
+ margin:8px auto!important;padding:0 12px!important;
+}
+html[data-md-enabled="true"] :is(#thread-bottom-container,#thread-bottom) [data-testid="composer-footer"] a{color:var(--md-link)!important;text-decoration:underline;}
+@media(max-width:600px){html[data-md-enabled="true"] form:has(#prompt-textarea){width:calc(100% - 16px)!important;}}
+html[data-md-enabled="true"] :is([role="dialog"],[role="menu"],[role="tooltip"],[data-radix-popper-content-wrapper]>div){background:var(--md-surface)!important;color:var(--md-text)!important;border-color:var(--md-line)!important;}
+html[data-md-enabled="true"] [data-message-author-role] :is(table th,table td){border-color:var(--md-line)!important;}
+html[data-md-enabled="true"] [data-message-author-role] blockquote{border-color:var(--md-accent)!important;}
+html[data-md-enabled="true"] [data-message-author-role] ::selection{background:var(--md-accent);color:var(--md-button-ink);}
+html[data-md-enabled="true"][data-md-focus="true"] :is(#stage-slideover-sidebar,#stage-sidebar-tiny-bar,nav[aria-label="Chat history"],[data-md-fixture-sidebar]){display:none!important;}
+/* Idle effects add no full-page filters, no canvas, no input interception. */
+#chatdrobe-scene{position:fixed;right:18px;bottom:110px;width:106px;height:106px;pointer-events:none!important;z-index:1;contain:strict;background:var(--md-art) center/contain no-repeat;}
+html[data-md-enabled="true"][data-md-motion="true"] #chatdrobe-scene{animation:cd-float 12s ease-in-out infinite alternate;}
+html[data-md-visible="false"] #chatdrobe-scene{animation-play-state:paused!important;}
+html[data-md-idle-running="true"] #chatdrobe-scene{visibility:hidden;}
+@keyframes cd-float{from{transform:translateY(0)}to{transform:translateY(-8px)}}
+@media(prefers-reduced-motion:reduce){#chatdrobe-scene{animation:none!important;}#chatdrobe-idle{display:none!important;}}
+@media(max-width:1100px){#chatdrobe-scene{display:none!important;}}
+@media print{#chatdrobe-scene,#chatdrobe-idle{display:none!important;}::highlight(chatdrobe-idle-bite){color:inherit!important;}}
+html[data-md-enabled="true"] ::highlight(chatdrobe-idle-bite){color:transparent;text-shadow:none;background-color:transparent;}
+
+/* Stationary, low-opacity textures retain each world’s identity. */
+html[data-md-enabled="true"][data-md-decoration="true"] main{background-image:var(--md-pattern)!important;background-size:var(--md-pattern-size)!important;}
+
+/* Explorer collection: distinct native-flow composer treatments. No renamed controls. */
+html[data-md-enabled="true"][data-md-theme="rally"] form:has(#prompt-textarea){border-radius:16px!important;border-top-width:3px!important;}
+html[data-md-enabled="true"][data-md-theme="bridge"] form:has(#prompt-textarea){border-radius:26px!important;box-shadow:0 8px 28px #234d8024,0 0 0 3px color-mix(in srgb,var(--md-accent) 8%,transparent)!important;}
+html[data-md-enabled="true"][data-md-theme="observatory"] form:has(#prompt-textarea){border-radius:18px!important;}
+/* Retain an opaque reading plane when decorative patterns are on. */
+html[data-md-enabled="true"]:is([data-md-theme="rally"],[data-md-theme="bridge"],[data-md-theme="observatory"]) [data-message-author-role="assistant"]{background-color:var(--md-bg)!important;}

@@ -6,7 +6,7 @@ function loadRenderer(){
  return resources;
 }
 const names={tokyo:'Rainy Tokyo Loft',starship:'Starship Journey',train:'Cozy Train Journey'};
-const eventNotes={rest:'Normal workspace. Nothing is sent or recorded.',CHAT_STARTED:'The desk lamp turns on; the spacecraft enters its active state.',USER_IDLE:'The cat closes its eyes; the spacecraft companion rests.',USER_RETURNED:'The companion wakes and the workspace returns to its active state.',FOCUS_STARTED:'Quiet Focus pauses ambient motion. Journey chapters can still advance.',FOCUS_COMPLETE:'The arrival marker celebrates a completed session. This demo awards no focus minutes.',RESPONSE_STREAMING:'The spacecraft signal lights pulse when motion is enabled. No response text is read.'};
+const eventNotes={rest:'Normal workspace. Nothing is sent or recorded.',CHAT_STARTED:'The desk lamp turns on; the spacecraft enters its active state.',USER_IDLE:'With motion enabled, the companion settles to sleep. Still mode keeps the scene at rest.',USER_RETURNED:'With motion enabled, the cat stretches in place. The workspace returns to its active state.',FOCUS_STARTED:'Quiet Focus pauses ambient motion. Journey chapters can still advance.',FOCUS_COMPLETE:'The arrival marker celebrates a completed session. This demo awards no focus minutes.',RESPONSE_STREAMING:'The spacecraft holds still while a response is streaming. No response text is read.'};
 for(const preview of document.querySelectorAll('[data-living-preview]')){
  const $=s=>preview.querySelector(s),buttons=[...preview.querySelectorAll('[data-env-select]')];
  let world=buttons.find(b=>b.getAttribute('aria-pressed')==='true')?.dataset.envSelect||'tokyo';
@@ -62,10 +62,11 @@ for(const preview of document.querySelectorAll('[data-living-preview]')){
   let day=time.value==='night'?'night':'day',chapter='Morning coffee';
   if(renderer){
    const d=definition();day=model.sceneLighting(time.value,snap.stage,d.stages.length);chapter=d.stages[snap.stage];
-   if(sceneWorld!==world){const next=renderer.createScene(document,d);scene?.element.remove();scene=next;sceneWorld=world;host.shadowRoot.append(scene.element);}
+   if(sceneWorld!==world){const next=renderer.createScene(document,d);scene?.dispose?.();scene?.element.remove();scene=next;sceneWorld=world;host.shadowRoot.append(scene.element);}
    const behavior=moment.value==='rest'?model.state():model.react(d,model.state(),moment.value);
    const arrived=behavior.arrived||snap.complete;
-   scene.update({...behavior,arrived,light:day,weather:weather.value,stage:snap.stage,label:chapter,motion:moving,active:canRun(),quiet:true});
+   const pose=moment.value==='USER_IDLE'?'sleep':moment.value==='USER_RETURNED'?'stretch':'rest';
+   scene.update({...behavior,arrived,light:day,weather:weather.value,stage:snap.stage,label:chapter,motion:moving,active:canRun(),quiet:true,pose,poseSerial:sequence,idleStage:moment.value==='USER_IDLE'?'comfortable':'working'});
    host.hidden=false;preview.dataset.ready='true';
    text($('[data-env-badge]'),arrived?'Session complete · '+chapter:chapter);
    text($('[data-env-chapter]'),`${snap.stage+1} / ${d.stages.length} · ${chapter}`);
@@ -100,6 +101,6 @@ for(const preview of document.querySelectorAll('[data-living-preview]')){
  listen(document,'visibilitychange',visibility);
  const observer='IntersectionObserver' in window?new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;visibility();}):null;
  observer?.observe(preview);
- listen(window,'pagehide',event=>{tour.visible(false);if(!event.persisted){alive=false;tour.destroy();observer?.disconnect();events.abort();sequence++;}});
+ listen(window,'pagehide',event=>{tour.visible(false);if(!event.persisted){alive=false;tour.destroy();scene?.dispose?.();observer?.disconnect();events.abort();sequence++;}});
  visibility();
 }

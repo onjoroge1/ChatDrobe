@@ -6,7 +6,7 @@ import {livingWorldsShowcase} from '../src/living-worlds.mjs';import {livingPrev
 import {buildContext,verifyBuildOutput} from './build-contract.mjs';import {accountPages} from '../src/accounts-pages.mjs';import {protectAccountPages,accountPageCopy} from './accounts-build.mjs';
 const context=buildContext(path.dirname(path.dirname(fileURLToPath(import.meta.url)))),{root,output}=context;
 console.log(`[build] Node ${process.version}; source=${root}; cwd=${context.workingDirectory}; invokedFrom=${context.invocationDirectory}; output=${output}`);
-const read=p=>JSON.parse(fs.readFileSync(path.join(root,p),'utf8')),config=read('site.config.json'),themes=read('src/themes.json'),art={...read('src/art.json'),...read('src/explorer-art.json')};
+const read=p=>JSON.parse(fs.readFileSync(path.join(root,p),'utf8')),releaseInfo=read('release.json'),config={...read('site.config.json'),extensionVersion:releaseInfo.extension.version,releaseStage:releaseInfo.extension.channel},themes=read('src/themes.json'),art={...read('src/art.json'),...read('src/explorer-art.json')};
 fs.rmSync(output,{recursive:true,force:true});fs.mkdirSync(path.join(output,'assets'),{recursive:true});
 function write(file,value){const p=path.join(output,file);fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,value);}
 for(const[id,svg]of Object.entries(art))write('assets/'+id+'.svg',svg);
@@ -24,7 +24,7 @@ function page(route,title,body,summary,scripts=[]){
 }
 page('/','Living worlds for your ChatGPT workspace',injectHome(home(themes,config),themes),'Explore Rainy Tokyo Loft, Starship Journey and Cozy Train Journey, plus a complete wardrobe of static themes for ChatGPT.');
 page('/themes/','Living environments and static themes',catalog(themes));
-for(const t of themes){page('/themes/'+t.id+'/',t.name+' theme for your workspace',world(t,themes),t.description+' Preview this original ChatDrobe theme and download appearance settings.');write('downloads/appearances/'+t.id+'.json',JSON.stringify({format:'chatdrobe-appearance',version:1,prefs:{theme:t.id,enabled:true,motion:false,decoration:true}},null,2)+'\n');}
+for(const t of themes){page('/themes/'+t.id+'/',t.name+' theme for your workspace',world(t,themes),t.description+' Preview this original ChatDrobe theme and download appearance settings.');write('downloads/appearances/'+t.id+'.json',JSON.stringify({format:'chatdrobe-appearance',version:1,prefs:{theme:t.id,mode:'theme',enabled:true,motion:false,decoration:true}},null,2)+'\n');}
 for(const[route,doc]of Object.entries(documents(config))){if(route==='/pricing/')continue;page(route,doc.title,documentPage(doc.title,doc.content));}
 page('/features/','Features',featuresPage(themes),'Explore Free themes and Plus Living environments, reading controls and local workspace tools for ChatGPT.');
 page('/premium/','ChatDrobe Plus — Living Worlds',premiumPage(themes),'Meet Rainy Tokyo Loft, Starship Journey and Cozy Train Journey. Plus includes all static themes and three Living environments; checkout is not enabled yet.');

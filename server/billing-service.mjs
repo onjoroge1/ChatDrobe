@@ -8,6 +8,20 @@ const worlds = new Set(['mooncat','circuit','comic','aurora','paper','midnight',
 const supportedEvents = new Set(['checkout.session.completed','checkout.session.async_payment_succeeded','checkout.session.async_payment_failed','checkout.session.expired',
   'customer.subscription.created','customer.subscription.updated','customer.subscription.deleted','invoice.paid','invoice.payment_failed',
   'charge.refunded','charge.dispute.created','charge.dispute.closed']);
+const CHECKOUT_REQUEST_VERSION = 2;
+const CHECKOUT_RETRY_WINDOW = 23 * 3600;
+
+function requireRetryableIntent(intent, now) {
+  // Stripe may prune idempotency results after 24h. Never rotate an uncertain attempt.
+  // Pre-v2 intents used an absolute one-hour expiry; preserving that request after
+  // its minimum creation window would fail validation, while changing it risks a duplicate.
+  const legacy = intent.requestVersion === undefined;
+  if (!Number.isSafeInteger(intent.created) || intent.created < 0 || intent.created > now ||
+    now - intent.created >= CHECKOUT_RETRY_WINDOW || (legacy && now >= intent.created + 1800))
+    throw new BillingError('UNCERTAIN_CHECKOUT', 'An existing checkout has an unknown outcome. Operator review is required; no new charge was created.', 409);
+  if (!legacy && intent.requestVersion !== CHECKOUT_REQUEST_VERSION)
+    throw new BillingError('CHECKOUT_CONFIGURATION_CHANGED', 'An existing checkout uses a different request contract. Resolve it before retrying.', 409);
+}
 
 /** Server authority only: the client never supplies a price, customer, subscription, or grant. */
 export function billingService({config, store, stripe, now = clock}) {
@@ -39,7 +53,7 @@ export function billingService({config, store, stripe, now = clock}) {
     if (charge && typeof charge === 'object') {
       if (charge.disputed === true || charge.refunded === true) state.hold = 'refund_or_dispute';
     } else if (eligible) {
-      // A paid flag without a verifiable card charge is not enough for this card-only pilot.
+      // A paid flag without a verifiable settled charge is not enough for this pilot.
       state.status = 'payment_unverified';
     }
     if (eligible && charge && typeof charge === 'object' && charge.livemode === false && charge.paid === true &&
@@ -70,11 +84,10 @@ export function billingService({config, store, stripe, now = clock}) {
       if (state.subscriptionId && !terminal.includes(state.status))
         throw new BillingError('SUBSCRIPTION_EXISTS', 'A subscription already exists. Refresh access or open Manage billing.', 409);
       if (!state.intent || state.sessionStatus === 'expired' || (state.sessionStatus === 'complete' && terminal.includes(state.status))) {
-        state.intent = {id: randomUUID(), created: now(), world: requestedWorld, priceId: config.priceId, origin: config.origin};
+        state.intent = {id: randomUUID(), created: now(), world: requestedWorld, priceId: config.priceId, origin: config.origin, requestVersion: CHECKOUT_REQUEST_VERSION};
         state.sessionId = null; state.sessionStatus = null; state.subscriptionId = null; state.status = 'free'; state.paidUntil = 0;
       }
-      if (now() - state.intent.created > 23 * 3600 && !state.sessionId)
-        throw new BillingError('UNCERTAIN_CHECKOUT', 'An old checkout has an unknown outcome. Operator review is required; no new charge was created.', 409);
+      if (!state.sessionId) requireRetryableIntent(state.intent, now());
       if (state.intent.priceId !== config.priceId || state.intent.origin !== config.origin)
         throw new BillingError('CHECKOUT_CONFIGURATION_CHANGED', 'An existing checkout must be resolved before changing billing configuration.', 409);
       return structuredClone(state);
@@ -96,10 +109,16 @@ export function billingService({config, store, stripe, now = clock}) {
       prepared.customerId = customer.id;
     }
     const intent = prepared.intent;
+    // Recheck after customer creation, which may have retried or taken time.
+    requireRetryableIntent(intent, now());
+    const legacy = intent.requestVersion === undefined;
     const session = await stripe('/checkout/sessions', {method: 'POST', idempotencyKey: `cd-test-checkout-${id}-${intent.id}`,
-      values: {mode: 'subscription', customer: prepared.customerId, 'payment_method_types[0]': 'card',
+      // Version 2 uses Stripe's default 24h lifetime and Dashboard payment methods.
+      // No request parameter is recalculated from the retry time. The legacy branch
+      // preserves already-sent parameters only; new attempts never use that contract.
+      values: {mode: 'subscription', customer: prepared.customerId, ...(legacy ? {'payment_method_types[0]': 'card'} : {}),
         'line_items[0][price]': intent.priceId, 'line_items[0][quantity]': 1,
-        client_reference_id: id, expires_at: intent.created + 3600,
+        client_reference_id: id, ...(legacy ? {expires_at: intent.created + 3600} : {}),
         'metadata[chatdrobe_install]': id, 'metadata[chatdrobe_attempt]': intent.id,
         'subscription_data[metadata][chatdrobe_install]': id, 'subscription_data[metadata][chatdrobe_attempt]': intent.id,
         success_url: intent.origin + '/api/billing?action=return', cancel_url: intent.origin + '/api/billing?action=return&cancelled=1'}});

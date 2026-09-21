@@ -1,52 +1,40 @@
-# ChatDrobe website, database and test billing
+# ChatDrobe
 
-Companion website for the ChatDrobe desktop Chrome extension, plus a Node billing API and Neon PostgreSQL integration. The extension runtime remains a separate package. Launch priorities remain payments, extension cleanup, release, then Gemini.
+ChatDrobe's desktop Chrome extension, companion website and test billing/account server are versioned together. The private review build is **0.8.0**; `release.json` is the version authority. This repository does not represent a live-payment or Chrome Web Store release.
 
-## Product routes
+- `browser-extension/extension/` — the Manifest V3 runtime loaded by Chrome.
+- `browser-extension/tests/` — state, worker, renderer and offline browser fixtures.
+- `src/` — website pages and scripts; scene previews use the extension's local modules.
+- `server/`, `api/` — account linking, short-lived signed access and test billing.
+- `docs/PREMIUM-REPAIR-ACCEPTANCE.md` — audit repairs and remaining release checks.
 
-- `/` — Living Worlds-first landing page
-- `/themes/` — 15 static themes plus separate Living environments
-- `/features/`, `/premium/`, `/pricing/` — Free/Plus features and $29/year display
-- `/living-worlds/` — interactive demonstration of existing environments
-- `/how-it-works/`, `/install/`, `/help/` — behavior, beta installation and support
+## Product behavior
 
-The static catalog contains 11 Free themes and four Plus themes. Rainy Tokyo Loft, Starship Journey and Cozy Train Journey are additional Living environments. Appearance JSON downloads select static preferences, not Living environments.
+Worlds is the primary extension gallery: select a theme, Living World or natural cat with a Still, Subtle or Playful motion choice. Selection clears conflicting effects. Reading controls and local workspace tools remain available separately. Page status distinguishes saved preferences, displayed content, paused motion and blocked placement. A website demonstration is explicitly a simulation.
 
-## Database status
+There are 15 static themes (11 Free and four Plus), three Plus Living Worlds and a Plus natural companion. Account approval on the website is not proof that the current extension installation has received valid access. The extension verifies signed entitlements; live payments remain disabled.
 
-PR #19 connected the existing Vercel `DATABASE_URL` to Neon. Production deployment of merge `09f4e26386637f9d508cc0714832dd222c2b0757` applied migration `001_billing`; the live custom-domain readiness endpoint returned HTTP 200 with configured/connected/schemaReady all true on September 16, 2026. This is a point-in-time verification, not an uptime guarantee.
+## Development
 
-- `/api/billing?action=database` — SELECT-only, cached/coalesced database readiness with no connection strings, schema details or user records in the response.
-- `/api/billing?action=health` — billing configuration status. It continues to report billing off.
-
-The database uses the existing billing state, webhook-deduplication and rate-limit tables plus migration history. It does not hold card details, conversation text or browser drafts. Subscriber login/account mapping is still unfinished; a working database does not grant Premium access.
-
-Read [Neon integration and release behavior](docs/NEON-DATABASE.md) for current setup. Its DATABASE_URL and production-migration instructions supersede the earlier installation-only pilot setup notes. No real credentials belong in this repository or the extension. Rotate exposed secrets in the provider, update Vercel and redeploy.
-
-## Payment implementation status
-
-`api/billing.js` and `server/` implement test Checkout creation/reuse, subscription reconciliation, billing-portal sessions, signed raw-body webhooks, PostgreSQL persistence and short-lived access tokens. `contracts/license.mjs` is the browser-safe verification contract for the future extension integration.
-
-**Billing remains off; live mode/keys are rejected.** The displayed price is $29/year, but checkout is not activated. Real Stripe sandbox checkout/webhook tests, verified sign-in, account-based recovery, extension integration and release-build removal of the tester bypass remain launch gates under Issue #6. The extension ZIP was not changed by the database milestone.
-
-## Development and tests
+Use Node 22 and Python 3 for release packaging.
 
 ```sh
-npm run check                  # static website build and contracts
-npm run install:billing        # locked server-only dependencies
-npm run test:billing           # unit/security/HTTP tests; simulated Stripe
-npm run db:status              # real SELECT-only check using server environment
-npm run db:migrate             # explicit initial-schema migration
-# Only a disposable localhost PostgreSQL service may run the integration suite:
-node --test server/integration/*.test.mjs
+npm run check                  # website build and contracts
+npm run check:extension        # extension build and tests
+npm run install:billing        # locked, server-only database driver
+npm run test:billing           # server/HTTP checks with simulated providers
+npm run check:all              # all three local suites
+npm run package:extension      # checked review ZIP plus SHA-256
 ```
 
-The static website remains dependency-free; the server dependency is isolated and locked. PostgreSQL integration tests exercise real SQL, including migration, concurrency, rollback and legacy-row preservation. Payment providers remain simulated in CI.
+The extension ZIP is written under `artifacts/extension/` with `manifest.json` at its root. The Extension quality workflow publishes the ZIP and checksum in `chatdrobe-extension-review`. See [extension setup](browser-extension/README.md). CI runs Node 22, website/offline Chromium fixtures and isolated PostgreSQL tests. Provider responses are simulated; these checks do not certify native installed Chrome, the changing signed-in ChatGPT DOM or real Stripe recovery.
 
-## Deployment and schema changes
+The static website and extension require no installed production JavaScript dependencies. The locked PostgreSQL driver is server-only. Only a disposable localhost database may run `node --test server/integration/*.test.mjs`.
 
-Build Output API v3 explicitly packages the static site and `/api/billing` function, including the legacy nested-root hosting layout. Repository root / Other / Node 22 remains the preferred dashboard configuration. Server source, migration SQL and secrets are never served as static files; migration code is not present in the HTTP function bundle.
+## Hosting and billing
 
-After packaging succeeds, `db:deploy` runs only for production `main` builds of this repository. It applies **only the reviewed additive initial billing schema**, protected by a transaction lock, migration checksum and schema validation. Already-applied migrations are not replayed; existing rows are retained. Incompatibility or missing database configuration fails the new release. Preview and local builds never migrate automatically. Future migration files require an explicit reviewed change; they are not discovered automatically.
+The Vercel Build Output configuration packages the static `dist/` site and isolated API functions. Server source, migration SQL, extension worker/account code and credentials are not public static assets. Current renderer modules are intentionally included only for the labeled site preview.
 
-No deployment step changes payment mode, creates Stripe subscriptions or configures authentication. The website remains noindex by default. Database reachability is not a completed payment launch, store publication or installed-extension integration test.
+`npm run db:status` checks readiness without returning credentials. `db:deploy` applies only reviewed additive schema migrations on production `main` builds of this repository, under a transaction lock. Preview/local builds never migrate automatically. See [database integration](docs/NEON-DATABASE.md).
+
+Billing remains off by default and live mode/keys are rejected. Public email sign-in requires configured delivery. Keep credentials and signing private keys in server configuration. Merging a repair does not enable these services, publish a store listing or satisfy the release checks. Website indexing and downloads require explicit release configuration; an empty download/store URL must not be presented as an available install.

@@ -1,0 +1,25 @@
+ChatDrobe 0.8.0 — private sandbox review build
+
+UPDATE AN EXISTING INSTALLATION
+Export a full backup from About. Keep the folder already loaded in Chrome. Extract the review ZIP and replace runtime files in that SAME folder, reload its existing card at chrome://extensions, then refresh ChatGPT. Confirm About reports 0.8.0. Do not uninstall or clear storage to update. The ZIP has manifest.json at its root.
+
+FIRST INSTALLATION
+Extract the ZIP to a permanent folder. Open chrome://extensions, enable Developer mode, choose Load unpacked, and select the folder containing manifest.json. Open ChatGPT and the ChatDrobe side panel from Chrome's extension action.
+
+CHOOSE ONE EXPERIENCE
+In Worlds choose Still, Subtle or Playful, then select a theme, Living World or natural cat companion. The selection applies that experience and motion level together. It replaces the previous experience. Match the light/dark appearance beside the gallery to the card you want. Review the page status after applying; a saved choice does not guarantee that ChatGPT has space to display it.
+
+WHEN A WORLD CANNOT BE DISPLAYED
+Scenes use a safe margin outside messages and the composer. A compact scene is used when only a small safe margin remains. If there is no safe margin, the page status explains the blockage. Collapse ChatGPT's sidebar, widen the browser, or choose a theme. The extension does not cover the conversation or silently reduce your reading width.
+
+MOTION IS A PREFERENCE, NOT A PROMISE OF CONSTANT MOVEMENT
+Still disables motion. Subtle and Playful allow short activity between quiet gaps; Playful allows more involved idle behavior. Input, selected text, response streaming, native media, reduced-motion settings, Quiet Focus, and hidden/unfocused tabs can pause it. The page status reports these reasons. Return focus to ChatGPT to observe idle motion. Inactivity can mean reading; choose Still whenever appropriate. The motion studio is a separate simulated preview.
+
+ACCOUNT CONNECTION
+Choose a Premium experience and follow Sign in / connect account. Allow optional www.chatdrobe.com access, sign in through the approval link, and approve the matching code. Return to the extension and refresh access. The extension verifies the signed entitlement before activating the saved choice. A linked device shown on the website does not prove this installation has connected. Public email sign-in and live checkout depend on server setup and are not enabled by this build.
+
+ACCESS AND LOCAL DATA
+Administrators retain complimentary Premium. Test subscribers require a verified test subscription. Valid signed access lasts at most ten minutes and refreshes periodically; a temporary error does not extend that expiry. An expired device link may require reconnection. Settings, notes and saved work stay local. Appearance imports and restored backups do not grant permission to sample page text. Export backups before updating; account recovery does not recover your local workspace.
+
+REVIEW SCOPE
+This is not a public live-payment or Chrome Web Store release. Native installed Chrome, the current signed-in ChatGPT layout and real Stripe sandbox account recovery remain release acceptance checks. See docs/PREMIUM-REPAIR-ACCEPTANCE.md in the source repository.

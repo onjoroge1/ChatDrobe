@@ -30,7 +30,7 @@ test('annual price is consistent and no public page still calls the price propos
  for(const route of ['/','/pricing/']){const h=get(route);assert.match(h,/\$29 <span>\/ year<\/span>/);assert.match(h,/Checkout is not enabled yet/);assert.match(h,/No payment is being collected/);}
 });
 test('beta setup and future concepts are unambiguous; no false Living appearance download',()=>{
- const h=get('/living-worlds/');assert.match(h,/About → Enable private tester preview → Living/);assert.match(h,/not included today/i);
+ const h=get('/living-worlds/');assert.match(h,/Still, Subtle or Playful/);assert.match(h,/Check display/);assert.doesNotMatch(h,/Enable private tester preview/);assert.match(h,/not included today/i);
  for(const name of ['Underwater Research Station','Wizard’s Study','Robot Colony','World Studio'])assert.ok(h.includes(name));
  assert.match(get('/install/'),/id="living"/);assert.match(h,/not a live ChatGPT session/);
 });

@@ -1,0 +1,40 @@
+name: Extension quality
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: extension-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  extension:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build, state and worker tests, review ZIP
+        run: npm run package:extension
+      - name: Generated runtime stays reproducible
+        run: git diff --exit-code -- browser-extension/extension
+      - name: Install fixture browser tools
+        run: |
+          python -m pip install -r browser-extension/tests/requirements.txt
+          python -m playwright install --with-deps chromium
+      - name: Offline Chromium fixtures (not native extension certification)
+        run: python browser-extension/tests/browser.py
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: chatdrobe-extension-review
+          path: |
+            artifacts/extension/
+            browser-extension/preview/
+          retention-days: 14

@@ -1,12 +1,12 @@
 import fs from 'node:fs';import path from 'node:path';
 /** Account-route-only UI. No role or secret is embedded in HTML. */
 export function installLinkUi(root,output){
- for(const name of ['account-link-ui.js','connection-flow.js'])fs.copyFileSync(path.join(root,'src',name),path.join(output,'assets',name));
+ const release=JSON.parse(fs.readFileSync(path.join(root,'release.json'),'utf8'));
+ for(const name of ['account-link-ui.js','connection-flow.js'])fs.writeFileSync(path.join(output,'assets',name),fs.readFileSync(path.join(root,'src',name),'utf8').replaceAll('__EXTENSION_VERSION__',release.extension.version));
  for(const route of ['signup','signin','account','admin']){const file=path.join(output,route,'index.html');let html=fs.readFileSync(file,'utf8');if(route==='admin')html=html.replace('Verified accounts','Registered accounts').replace('Free accounts','Free subscriptions');html=html.replace('</head>','<script type="module" src="/assets/account-link-ui.js"></script></head>');if(route==='signup'||route==='signin')html=html.replace('</h1>','</h1><p class="micro">This browser remembers your account for up to 30 days. Sign out when using a shared device.</p>');fs.writeFileSync(file,html);}
  fs.appendFileSync(path.join(output,'assets/accounts.css'),'\n.account-shell>[data-connection-success]{grid-column:1/-1}\n');
  const file=path.join(output,'assets/accounts.js');let js=fs.readFileSync(file,'utf8');
  function replace(before,after){if(!js.includes(before))throw new Error('Review the changed account UI before building: '+before.slice(0,45));js=js.replace(before,after);}
- replace('location.assign(destination());',"const link=new URLSearchParams(location.hash.slice(1)).get('link')||'';location.assign(destination()+(/^[A-F0-9]{5}(?:-[A-F0-9]{5}){3}$/.test(link)?'#link='+encodeURIComponent(link):''));");
  js=js.replace("emailDelivery:'Verified sender / email API'","authentication:'Verified email login or configured owner login'");
  replace('const{user,subscription,payments}=profile;', 'const{user,subscription,payments,access={}}=profile;');
  replace("subscription.plan==='test_plus'?'Test Plus — no live charge':'Free'", "access.complimentary?'Admin Premium — complimentary':subscription.plan==='test_plus'?'Test Plus — no live charge':'Free'");

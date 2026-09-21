@@ -1,3 +1,4 @@
+import {linkFragment} from './connection-flow.js';
 /* Same-origin cookie-authenticated UI. Credentials never enter localStorage or URLs. */
 const page=document.querySelector('[data-account-page]');
 if(page){
@@ -14,7 +15,7 @@ if(page){
  if(mode==='signup'||mode==='signin'){
   const emailForm=$('[data-auth-email]'),codeForm=$('[data-auth-code]');busy(async()=>{const status=await call('status');if(!status.signInAvailable){note('Email sign-in is not connected yet. No code will be sent until setup is complete.');return;}emailForm.hidden=false;note('Enter your email to receive a one-time code.');});
   emailForm.addEventListener('submit',event=>{event.preventDefault();busy(async()=>{const input={email:emailForm.elements.email.value,mode};if(mode==='signup')input.acceptBeta=emailForm.elements.acceptBeta.checked;note('Sending your verification code…');const reply=await call('request-code',input);emailForm.hidden=true;codeForm.hidden=false;note(reply.message);codeForm.elements.code.focus();});});
-  codeForm.addEventListener('submit',event=>{event.preventDefault();busy(async()=>{note('Verifying your code…');await call('verify-code',{code:codeForm.elements.code.value.trim()});codeForm.reset();location.assign(destination());});});
+  codeForm.addEventListener('submit',event=>{event.preventDefault();busy(async()=>{note('Verifying your code…');await call('verify-code',{code:codeForm.elements.code.value.trim()});codeForm.reset();location.assign(destination()+linkFragment(location.hash));});});
   $('[data-auth-again]').addEventListener('click',()=>{codeForm.reset();codeForm.hidden=true;emailForm.hidden=false;note('Enter your email and request a fresh code.');emailForm.elements.email.focus();});
  }else{
   async function refreshProfile(){try{profile=await call('me');$('[data-account-signedout]').hidden=true;}catch(e){if(e.status===401||e.status===403){signedOut();note(e.message,true);return false;}throw e;}return true;}
