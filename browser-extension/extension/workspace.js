@@ -4,7 +4,7 @@
  */
 (async function () {
   'use strict';
-  const C=globalThis.MoodDockCore;
+  const C=globalThis.MoodDockCore,P=globalThis.ChatDrobePrefs;
   if(!C || document.getElementById('mooddock-root')) return;
   const DEMO=globalThis.__MOODDOCK_DEMO__===true;
   const SIDE=location.protocol==='chrome-extension:'||globalThis.__CHATDROBE_SIDE_FIXTURE__===true;
@@ -14,7 +14,8 @@
   const sheet=document.createElement('style');sheet.textContent=globalThis.MoodDockPanelCSS;shadow.append(sheet);
   document.documentElement.append(root);
   let access={premium:false,testerPreview:false,paid:false},demoPreview=false;
-  let s=C.state(),tab='worlds',filter='All',tier='free',tool='prompts',open=true,promptQuery='',lastFocus=null;
+  let s=C.state(),desiredPrefs=s.prefs,tab='worlds',filter='All',tier='all',tool='prompts',open=true,promptQuery='',lastFocus=null;
+  let motionChoice='still',pageStatus=null,pageCheck=0,expectedRevision=0;
   let localQueue=Promise.resolve(),uiQueue=Promise.resolve(),noteDirty=false,noteSaving=false,clockTick=null,lastScene=null;
   // Sandboxed previews may not expose localStorage. The demo can still run in memory.
   let demoStorage=null,demoMemory={};
@@ -51,12 +52,12 @@
     if(DEMO){
       localQueue=localQueue.catch(()=>{}).then(()=>{
         let raw=demoMemory;if(demoStorage){try{raw=JSON.parse(demoStorage.getItem('mooddock-demo')||'{}');}catch{raw={};}}
-        let data=C.state(raw);if(kind==='mutate'){data=C.reduce(data,action);if(demoStorage)demoStorage.setItem('mooddock-demo',JSON.stringify(data));else demoMemory=data;}return data;
+        let data=C.state(raw);if(kind==='mutate'){data=C.reduce(data,action);if(demoStorage)demoStorage.setItem('mooddock-demo',JSON.stringify(data));else demoMemory=data;}desiredPrefs=data.prefs;return data;
       });return localQueue;
     }
     const reply=await chrome.runtime.sendMessage({scope:'mooddock',kind,action});
     if(!reply?.ok)throw new Error(reply?.error||'Extension was reloaded. Refresh this page.');
-    access=reply.access||access;return C.state(reply.state);
+    access=reply.access||access;desiredPrefs=P.prefs(reply.desiredPrefs||reply.state?.prefs);expectedRevision=reply.revision??expectedRevision;return C.state(reply.state);
   }
   function mutate(action,redraw=false){
     const run=uiQueue.catch(()=>{}).then(async()=>{
@@ -66,7 +67,40 @@
   }
   async function openUpgrade(world='',target=null){
     if(DEMO){info('Premium upgrade preview. Checkout is not connected; no payment is collected.');return;}
-    try{info('Checking Premium access…');const reply=await chrome.runtime.sendMessage({scope:'mooddock',kind:'open-upgrade',world,target});if(!reply?.ok)throw new Error(reply?.error||'Could not check access.');if(reply.applied){access=reply.access;s=C.state(reply.state);apply();render();info(access.adminPremium?'Applied with complimentary Admin Premium.':'Premium theme applied.');}else info(reply.errorHint||'Connect your account once to continue. The selected world will be applied when Premium is verified.');}catch(e){info(e.message,true);}
+    try{info('Checking Premium access…');const reply=await chrome.runtime.sendMessage({scope:'mooddock',kind:'open-upgrade',world,target});if(!reply?.ok)throw new Error(reply?.error||'Could not check access.');if(reply.applied){access=reply.access;s=C.state(reply.state);desiredPrefs=P.prefs(reply.desiredPrefs||s.prefs);expectedRevision=reply.revision??expectedRevision;motionChoice=P.experience(s.prefs).motion;apply();render();await checkPageExperience();}else info(reply.errorHint||'Selection remembered, including motion. Connect your account to verify Premium, then return to ChatGPT.');}catch(e){info(e.message,true);}
+  }
+  async function selectExperience(value){
+    const selection={motion:motionChoice,...value};
+    if(!access.premium&&ChatDrobeAccess.requiresPremium(C.selectExperience(s.prefs,selection))){await openUpgrade(selection.kind==='theme'?selection.id:'',selection);return false;}
+    pageStatus=null;
+    if(!await mutate({type:'select-experience',value:selection},true))return false;
+    motionChoice=P.experience(s.prefs).motion;
+    await checkPageExperience();return true;
+  }
+  function pageStatusText(){
+    if(DEMO)return 'Panel preview only. Open the installed extension on ChatGPT to check display.';
+    if(!pageStatus)return 'Selection is saved. Check the active ChatGPT tab to confirm display.';
+    if(pageStatus.state==='paused'&&!pageStatus.visible)return ['Selection saved; the scene is currently hidden.',pageStatus.reason,pageStatus.action].filter(Boolean).join(' ');
+    const lead=({applied:'Theme styling reached the active ChatGPT tab.',displayed:'Displayed on the active ChatGPT tab.',paused:'Visible on the active ChatGPT tab; motion is paused.',blocked:'Selected, but the scene cannot be displayed here.',off:'Styling is paused.',loading:'Selected; waiting for the active ChatGPT tab.',unconfirmed:'Selection saved; page display is not confirmed.'})[pageStatus.state]||'Page display is not confirmed.';
+    return [lead,pageStatus.reason,pageStatus.action].filter(Boolean).join(' ');
+  }
+  function drawPageStatus(){for(const node of shadow.querySelectorAll('[data-page-status]'))node.textContent=pageStatusText();}
+  async function checkPageExperience(){
+    const check=++pageCheck;
+    if(DEMO){info(pageStatusText());return;}
+    pageStatus={state:'loading'};drawPageStatus();
+    for(let attempt=0;attempt<4;attempt++){
+      try{
+        const reply=await chrome.runtime.sendMessage({scope:'mooddock',kind:'diagnostics'});
+        if(check!==pageCheck)return;
+        if(!reply?.ok)throw new Error(reply?.error||'Open a ChatGPT conversation and refresh it after installing this build.');
+        const active=P.experience(s.prefs),observed=reply.experience;
+        const matches=observed&&observed.kind===active.kind&&observed.id===active.id&&observed.motion===active.motion&&(observed.revision??0)>=expectedRevision;
+        if(matches&&observed.state!=='loading'){pageStatus=observed;drawPageStatus();info(pageStatusText(),observed.state==='blocked');return;}
+        if(attempt<3)await new Promise(resolve=>setTimeout(resolve,200));
+      }catch(error){pageStatus={state:'unconfirmed',action:error.message};drawPageStatus();info(pageStatusText());return;}
+    }
+    pageStatus={state:'unconfirmed',action:'Keep ChatGPT open, then choose Check display again.'};drawPageStatus();info(pageStatusText());
   }
   function settings(value,redraw=false){
     if(!access.premium&&ChatDrobeAccess.requiresPremium(value)){void openUpgrade(value.theme||'',value);render();return Promise.resolve(false);}
@@ -179,32 +213,70 @@
   }
   function changeTab(next){if(noteDirty){info('Save your notes before switching sections.',true);return;}tab=next;render();}
   function render(){
-    nav.replaceChildren(...[['worlds','Worlds'],['read','Read'],['living','Living'],['play','Play'],['tools','Tools'],['account','Account'],['about','About']].map(([key,label])=>button(label,()=>changeTab(key),'',{'aria-pressed':String(tab===key)})));
+    nav.replaceChildren(...[['worlds','Worlds'],['read','Read'],['tools','Tools'],['account','Account'],['about','About']].map(([key,label])=>button(label,()=>changeTab(key),'',{'aria-pressed':String(tab===key||key==='worlds'&&['living','play'].includes(tab))})));
     body.replaceChildren();
     if(tab==='worlds')renderWorlds();else if(tab==='read')renderRead();else if(tab==='living')renderLiving();else if(tab==='play')renderPlay();else if(tab==='tools')renderTools();else if(tab==='account')renderAccount();else renderAbout();
     syncClock();
   }
   function renderWorlds(){
-    body.append(...title('YOUR WORKSPACE, REIMAGINED','Find your world.','Free essentials. Premium personality. Choose a Premium world to review the upgrade, then connect your account.'));
+    body.append(...title('ONE WORKSPACE, YOUR CHOICE','Find your world.','Choose motion, then select a world to apply both. Themes, Living Worlds and companions live here.'));
+    const active=P.experience(s.prefs);
+    const mode=el('select',{'aria-label':'Gallery appearance',on:{change:async e=>{await settings({mode:e.target.value},true);await checkPageExperience();}}},...[
+      ['light','Light'],['dark','Dark'],['theme','Each world’s original palette'],['system','Follow system'],['chatgpt','Follow ChatGPT']
+    ].map(([value,label])=>el('option',{value},label)));mode.value=s.prefs.mode;
+    body.append(field('Appearance',mode,s.prefs.mode==='chatgpt'?'Cards show the system palette as a preview. The page follows ChatGPT’s own light or dark setting.':''));
+    body.append(el('div',{class:'motionChoice',role:'group','aria-label':'Motion'},el('span',{class:'fieldTitle'},'Motion for your next selection'),el('div',{class:'motionOptions'},...[
+      ['still','Still'],['subtle','Subtle'],['playful','Playful']
+    ].map(([value,label])=>button(label,()=>{motionChoice=value;render();},'',{'aria-pressed':String(motionChoice===value)}))),el('p',{class:'tiny'},active.kind==='theme'?'Still has no animation. Subtle and Playful use the same gentle decoration movement on themes; Living Worlds and Natural Cat add idle routines in Playful.':'Still has no animation. Subtle keeps movement quiet; Playful adds idle routines. Reduced motion and reading activity can pause either.'),el('p',{class:'tiny'},`Current selection’s motion: ${active.motion}. Select a card to apply a new choice.`)));
+    body.append(el('div',{class:'experienceStatus'},el('p',{'data-page-status':'',role:'status'},pageStatusText()),button('Check display',()=>checkPageExperience(),'ghost')));
+    if(['stroll','bites'].includes(s.prefs.idleMode))body.append(el('p',{class:'readingNote'},`Advanced effect selected: ${s.prefs.idleMode==='bites'?'Word Bites':'world routine'}. Choosing a world returns to its motion choice.`));
     body.append(el('div',{class:'tierTabs',role:'group','aria-label':'Theme collection'},
+      button('All worlds',()=>{tier='all';filter='All';render();},'',{'aria-pressed':String(tier==='all')}),
       button('Free · '+C.THEMES.filter(t=>t.plan==='free').length,()=>{tier='free';filter='All';render();},'',{'aria-pressed':String(tier==='free')}),
-      button('Premium · '+C.THEMES.filter(t=>t.plan==='pro').length,()=>{tier='pro';filter='All';render();},'',{'aria-pressed':String(tier==='pro')})));
-    if(tier==='pro')body.append(el('div',{class:'premiumNote'},access.premium?(access.adminPremium?'Admin Premium · complimentary':'Test Plus verified.'):'Premium is locked. Connect an account to test the subscription.',button('Meet the companions',()=>changeTab('play'),'ghost')));
-    body.append(el('div',{class:'filters'},...['All',...new Set(C.THEMES.map(t=>t.label))].map(v=>button(v,()=>{filter=v;render();},'chip',{'aria-pressed':String(filter===v)}))));
+      button('Premium',()=>{tier='pro';filter='All';render();},'',{'aria-pressed':String(tier==='pro')})));
+    if(tier!=='free')body.append(el('p',{class:'premiumNote'},access.premium?(access.adminPremium?'Admin Premium · complimentary':'Test Plus verified.'):'Premium selections require a verified account. Your world and motion choice are remembered while you connect.'));
+    body.append(el('div',{class:'filters'},...['All','Themes','Living Worlds','Companion'].map(v=>button(v,()=>{filter=v;render();},'chip',{'aria-pressed':String(filter===v)}))));
     const grid=el('div',{class:'grid'});
-    for(const t of C.THEMES.filter(t=>t.plan===tier&&(filter==='All'||t.label===filter))){
+    const entries=[...C.THEMES.map(t=>({kind:'theme',id:t.id,theme:t,name:t.name,label:t.label,plan:t.plan,description:t.description})),
+      ...[['tokyo','Rainy Tokyo Loft','A city window, a desk lamp and an illustrated cat.'],['starship','Starship Journey','A view of space that progresses with your focus timer.'],['train','Cozy Train Journey','Changing countryside outside a quiet train window.']].map(([id,name,description])=>({kind:'living',id,theme:C.themeById(C.selectExperience(s.prefs,{kind:'living',id,motion:motionChoice}).theme),name,label:'Living World',plan:'pro',description})),
+      {kind:'companion',id:'cat',theme:{...C.themeById(s.prefs.theme),motif:'cat'},name:'Natural Cat',label:'Companion',plan:'pro',description:'An articulated cat beside your current theme. Still, subtle or playful in one selection.'}];
+    for(const entry of entries.filter(t=>(tier==='all'||t.plan===tier)&&(filter==='All'||filter==='Themes'&&t.kind==='theme'||filter==='Living Worlds'&&t.kind==='living'||filter==='Companion'&&t.kind==='companion'))){
+      const scheme=P.scheme({...s.prefs,theme:entry.theme.id},{nativeDark:!!window.matchMedia?.('(prefers-color-scheme: dark)').matches,systemDark:!!window.matchMedia?.('(prefers-color-scheme: dark)').matches});
+      const t={...entry.theme,...P.themeById(entry.theme.id).variants[scheme],dark:scheme==='dark'};
       const cover=el('div',{class:'cover'});cover.style.background=`radial-gradient(ellipse at 10% 10%, ${t.soft}, transparent),linear-gradient(140deg,${t.bg},${t.panel})`;cover.style.color=t.muted;
       cover.append(el('div',{class:'miniwindow'},...Array.from({length:4},()=>el('i'))),art(t));
-      const locked=t.plan==='pro'&&!access.premium;
-      const card=button('',()=>locked?openUpgrade(t.id):settings({theme:t.id,enabled:true,accent:''},true),'world',{'aria-label':`${locked?'Upgrade for':'Apply'} ${t.name}`,'aria-pressed':String(s.prefs.theme===t.id&&s.prefs.enabled),title:t.description});
-      card.append(cover,el('div',{class:'worldinfo'},el('span',{class:'worldtitle'},t.name),el('span',{class:'worldmeta'},el('span',{},t.label),el('span',{},t.plan==='free'?'Free':(access.premium?(access.adminPremium?'Admin Premium':'Test Plus'):'Premium · locked')))));
+      if(entry.kind!=='theme')void drawSceneCover(cover,entry);
+      const locked=entry.plan==='pro'&&!access.premium;
+      const selected=active.kind===entry.kind&&active.id===entry.id&&s.prefs.enabled;
+      const card=button('',()=>selectExperience({kind:entry.kind,id:entry.id}),'world',{'aria-label':`${locked?'Connect for':'Select'} ${entry.name}`,'aria-pressed':String(selected),'data-experience':entry.kind+':'+entry.id,'data-preview-scheme':scheme,title:entry.description});
+      card.append(cover,el('div',{class:'worldinfo'},el('span',{class:'worldtitle'},entry.name),el('span',{class:'worldmeta'},el('span',{},entry.label),el('span',{},entry.plan==='free'?'Free':'Premium')),el('span',{class:'worlddetail'},entry.description)));
       if(locked)card.append(el('span',{class:'lockBadge','aria-hidden':'true'},'Premium'));
-      if(!locked&&s.prefs.theme===t.id&&s.prefs.enabled)card.append(el('span',{class:'check','aria-hidden':'true'},'✓'));
+      if(selected)card.append(el('span',{class:'check','aria-hidden':'true'},'✓'));
       grid.append(card);
     }
     if(!grid.children.length)grid.append(el('p',{class:'empty'},'No worlds in this filter. Choose All.'));
-    body.append(el('p',{class:'readingNote'},'New: Rally Garage · Orbital Bridge · Solar Observatory. Complete light/dark worlds are Free; their idle routines are Premium features.'),grid,el('div',{class:'callout'},el('strong',{},'Themes, not just a coat of paint.'),'Coordinated surfaces, type controls, conversation bubbles, patterns and original little companions.'));
-    body.append(el('p',{class:'notice'},'All characters here are original prototype designs. No Hello Kitty, Transformers, Marvel or DC assets are included.'));
+    body.append(grid,el('p',{class:'readingNote'},'Living Worlds and companions use clear page margins. If the window has too little room, the display status explains how to make space. A saved selection does not guarantee a visible scene.'));
+    body.append(el('div',{class:'row advancedLinks'},button('Scene details & focus journeys',()=>changeTab('living')),button('Advanced effects',()=>changeTab('play'))));
+  }
+  let scenePreviewModules;
+  async function drawSceneCover(cover,entry){
+    // Preview the same bundled, still scene as the page renderer, with no page observation.
+    if(DEMO||typeof chrome.runtime.getURL!=='function'){cover.append(el('span',{class:'previewLabel'},'Illustration · page preview unavailable'));return;}
+    try{
+      scenePreviewModules??=Promise.all([import(chrome.runtime.getURL('living/quiet-scene.mjs')),import(chrome.runtime.getURL('living/model.mjs'))]);
+      const [{createScene,SCENE_CSS},{worldById,settings:sceneSettings,sceneLighting}]=await scenePreviewModules;
+      if(!cover.isConnected)return;
+      const host=el('div',{class:'scenePreview','aria-hidden':'true'}),preview=host.attachShadow({mode:'open'});
+      const target=C.selectExperience(s.prefs,{kind:entry.kind,id:entry.id,motion:motionChoice});
+      const world=worldById(entry.kind==='companion'?'tokyo':target.livingWorld);
+      const opts=sceneSettings({world:world.id,weather:entry.kind==='companion'?'clear':target.livingWeather,time:target.livingTime});
+      const scene=createScene(document,world);
+      if(entry.kind==='companion')scene.setCompanionOnly();
+      scene.update({light:sceneLighting(opts.time,0,world.stages.length),weather:opts.weather,stage:0,motion:false,active:false,pose:'rest'});
+      preview.append(el('style',{},SCENE_CSS+'\n.room{height:100%;border-radius:0}'),scene.element);
+      cover.replaceChildren(host);
+      if(target.livingTime==='journey')cover.append(el('span',{class:'previewLabel'},'Journey start · still preview'));
+    }catch{cover.append(el('span',{class:'previewLabel'},'Scene preview unavailable'));}
   }
   function switchControl(label,key,detail){const input=el('input',{type:'checkbox',checked:s.prefs[key],on:{change:e=>settings({[key]:e.target.checked})}});return el('label',{class:'switch'},el('span',{},label,detail?el('div',{class:'detail'},detail):null),input);}
   function rangeControl(label,key,min,max,step,unit){
@@ -223,63 +295,54 @@
     body.append(button('Match ChatGPT light / dark',()=>settings({mode:'chatgpt'},true),'primary'));
     body.append(el('p',{class:'readingNote'},'The input bar is centered in the conversation column, with a separate surface and visible focus ring. The original ChatGPT warning remains visible in the native footer.'));
     body.append(field('Reading font',font),rangeControl('Text size','fontSize',13,24,1,' px'),rangeControl('Line spacing','lineHeight',1.3,2.2,.05,'×'),rangeControl('Conversation width','width',600,1400,25,' px'));
-    body.append(switchControl('Focus mode','focus','Hide the history sidebar. Turn off to restore it.'),switchControl('Conversation bubbles','bubbles'),switchControl('Ambient decorations','decoration'),switchControl('Gentle companion motion','motion','Off by default. For articulated cat behaviors, choose Natural companion in Play. Reduced motion is respected.'));
+    body.append(switchControl('Focus mode','focus','Hide the history sidebar. Turn off to restore it.'),switchControl('Conversation bubbles','bubbles'),switchControl('Ambient decorations','decoration'),button('Choose world & motion',()=>changeTab('worlds')));
     body.append(el('hr',{class:'rule'}));
     const name=el('input',{type:'text',maxlength:60,placeholder:'e.g. My writing desk','aria-label':'Workspace name'});
     body.append(field('Save this workspace',name),button('Save workspace',async()=>{if(await mutate({type:'preset-add',id:uid(),name:name.value},true))info('Workspace saved locally.');},'primary'));
-    const list=el('div',{class:'stack'});for(const p of s.presets)list.append(el('div',{class:'saved'},el('div',{class:'savedtitle'},p.name),el('div',{class:'row'},button('Apply',()=>settings({...p.prefs,enabled:true},true)),button('Delete',()=>mutate({type:'preset-delete',id:p.id},true),'ghost danger',{'aria-label':`Delete workspace ${p.name}`}))));body.append(list);
+    const list=el('div',{class:'stack'});for(const p of s.presets)list.append(el('div',{class:'saved'},el('div',{class:'savedtitle'},p.name),el('div',{class:'row'},button('Apply',async()=>{if(await settings({...p.prefs,enabled:true},true)){motionChoice=P.experience(s.prefs).motion;await checkPageExperience();}}),button('Delete',()=>mutate({type:'preset-delete',id:p.id},true),'ghost danger',{'aria-label':`Delete workspace ${p.name}`}))));body.append(list);
     body.append(el('p',{class:'readingNote'},'Reading controls do not change the AI model or its answers. These are comfort preferences, not a medical treatment or an accessibility certification.'));
   }
   function selectControl(label,key,options){const select=el('select',{'aria-label':label,on:{change:e=>settings({[key]:key==='idleSeconds'?Number(e.target.value):e.target.value},key==='companion')}},...options.map(([v,n])=>el('option',{value:v},n)));select.value=String(s.prefs[key]);return field(label,select);}
   function renderLiving(){
-    body.append(...title('PLUS · LIVING WORLDS LAB','Choose a place, not a palette.','Layered rooms, weather and focus journeys. No conversation text, sound or external weather service is used.'));
-    const worlds=[['tokyo','Rainy Tokyo Loft','mooncat','A window over the city. A desk lamp and a sleeping cat.'],['starship','Starship Journey','bridge','Earth → Moon → asteroids → Jupiter → deep space.'],['train','Cozy Train Journey','paper','City → farmland → mountains → snow → sunset.']];
+    body.append(button('← Back to Worlds',()=>changeTab('worlds')),...title('OPTIONAL SCENE DETAILS','Tune your scene.','World and motion are chosen together in Worlds. These controls customize the selected scene.'));
     if(!access.premium){
-      body.append(el('div',{class:'callout'},'Connect your account to verify your subscription or complimentary administrator access.'),button('Explore Plus',()=>openUpgrade(),'primary'));
-      for(const [id,name,palette,detail] of worlds)body.append(el('div',{class:'saved'},el('strong',{},name),el('p',{class:'tiny'},detail),button('Connect for '+name,()=>openUpgrade(palette,{theme:palette,livingEnabled:true,livingWorld:id}),'ghost')));
-      body.append(el('p',{class:'tiny'},'Your selected world is remembered and applied after verification. Motion stays off until you enable it.'));return;
+      body.append(el('div',{class:'callout'},'Choose a Living World from the gallery to remember the complete selection while you connect your account.'),button('Choose a Living World',()=>{filter='Living Worlds';tier='all';changeTab('worlds');},'primary'));return;
     }
-    for(const [id,name,palette,detail] of worlds){body.append(el('div',{class:'saved'},el('strong',{},name),el('p',{class:'tiny'},detail),button(s.prefs.livingEnabled&&s.prefs.livingWorld===id?'Selected':'Enter world',()=>settings({livingEnabled:true,livingWorld:id,livingWeather:id==='tokyo'?'rain':'clear',theme:palette,enabled:true},true),s.prefs.livingWorld===id?'primary':'ghost')));}
+    if(P.experience(s.prefs).kind==='theme')body.append(el('p',{class:'readingNote'},'A theme is currently selected. Scene details are remembered for your next Living World or companion.'));
     body.append(selectControl('Environment presentation','livingView',[['portal','Portal — a small window'],['full','Full World — around the reading column']]));
     const weather=s.prefs.livingWorld==='starship'?['clear','aurora']:['clear','rain','snow','fog'];
     body.append(selectControl('Illustrated weather','livingWeather',weather.map(v=>[v,v[0].toUpperCase()+v.slice(1)])),selectControl('Scene lighting','livingTime',[['day','Day'],['dusk','Golden hour'],['night','Night'],['journey','Follow focus journey'],['local','Follow local clock (not real sunrise)']]));
-    body.append(selectControl('Companion behavior','livingBehavior',[['progressive','Progressive — richer behavior as the workspace rests'],['subtle','Subtle — blinks and quiet breaths only']]));
     body.append(el('p',{class:'readingNote'},'45 seconds: notice and look. 2 minutes: groom or scratch. 4 minutes: stretch and knead. 8–10 minutes: settle to sleep. Actions stay in the margin with long quiet gaps. Reading without input also counts as inactivity; use Subtle or Quiet during focus for stillness.'));
     body.append(button('Preview the motion — no waiting',()=>{const url=chrome.runtime.getURL('motion-preview.html');chrome.tabs.create({url});},'ghost'));
-    body.append(el('h3',{},'Atmosphere recipes'),el('div',{class:'row'},button('Rainy writing',()=>settings({livingEnabled:true,livingWorld:'tokyo',livingWeather:'rain',livingTime:'dusk',theme:'mooncat',enabled:true},true)),button('Deep-space focus',()=>settings({livingEnabled:true,livingWorld:'starship',livingWeather:'aurora',livingTime:'night',livingQuiet:true,theme:'bridge',enabled:true},true)),button('Snowy window seat',()=>settings({livingEnabled:true,livingWorld:'train',livingWeather:'snow',livingTime:'day',theme:'paper',enabled:true},true))));
-    body.append(switchControl('Ambient scene motion','livingMotion','Off by default. Articulated companions, subtle weather and scene depth. Input, selected text and streaming pause movement; no conversation content is read.'),switchControl('Quiet during focus','livingQuiet','Keeps all motion and companion routines still during a focus session. No scene badges or completion pop-ups.'),switchControl('Activity reactions','livingReactions','Locally observes input occurrence and composer control state, never draft text or key values. Sleep/wake, desk light and supported streaming signals.'));
+    body.append(switchControl('Quiet during focus','livingQuiet','Keeps motion still during a focus session. Turn this off if you want the motion selected in Worlds during timer sessions.'),switchControl('Activity reactions','livingReactions','Locally observes input occurrence and composer control state, never draft text or key values. Sleep/wake, desk light and supported streaming signals.'));
     body.append(el('div',{class:'callout'},'Journeys use the focus timer, not how much you type. Elapsed timer minutes are not measured productive work.'),el('div',{class:'row'},...[5,25,45,90].map(m=>button(m+' min journey',async()=>{if(await mutate({type:'timer',value:Date.now()+m*60000}))info('Focus session started. Return to ChatGPT; the scene advances at chapter boundaries.');}))),button('Cancel focus session',()=>mutate({type:'timer',value:0})));
     const progress=el('p',{class:'readingNote'},'Focus totals are stored locally.');body.append(progress);
     if(!DEMO)chrome.runtime.sendMessage({scope:'mooddock',kind:'living-state'}).then(r=>{if(r?.ok&&progress.isConnected)progress.textContent=`Completed timer sessions: ${r.progress.completed} · Scheduled minutes completed: ${r.progress.minutes}. No message contents are stored.`;}).catch(()=>{});
-    body.append(button('Refresh focus totals',()=>render()),button('Reset focus history',async()=>{if(!confirm('Reset timer-session totals and cancel the current focus timer? Notes and saved prompts stay unchanged.'))return;if(!DEMO){const r=await chrome.runtime.sendMessage({scope:'mooddock',kind:'living-reset-progress'});if(!r?.ok){info(r?.error||'Reset failed.',true);return;}s=await request('read');}render();}),button('Turn Living Worlds off',()=>settings({livingEnabled:false},true),'primary'));
+    body.append(button('Refresh focus totals',()=>render()),button('Reset focus history',async()=>{if(!confirm('Reset timer-session totals and cancel the current focus timer? Notes and saved prompts stay unchanged.'))return;if(!DEMO){const r=await chrome.runtime.sendMessage({scope:'mooddock',kind:'living-reset-progress'});if(!r?.ok){info(r?.error||'Reset failed.',true);return;}s=await request('read');}render();}),button('Return to theme only',()=>selectExperience({kind:'theme',id:s.prefs.theme,motion:'still'}),'primary'));
     body.append(el('p',{class:'readingNote'},'Full World protects the whole reading band. Portal uses a clear margin above the input area. If no margin exists, the scene hides instead of covering controls; try a narrower conversation width. Audio, real weather, custom uploads and creator publishing are not implemented.'));
   }
   function renderPlay(){
-    body.append(...title(access.testerPreview?'PREMIUM · PRIVATE TESTER PREVIEW':'PREMIUM COMPANIONS','A little life on your desk.','Original companions that wait until you pause. No sound, no autoplay video, no message deletion.'));
-    if(!access.premium){body.append(el('div',{class:'callout'},el('strong',{},'A natural companion, not a floating emoji.'),'The illustrated cat looks, grooms, scratches and stretches in place after quiet intervals. All effects yield to input and respect reduced motion.'),button('Explore Premium',()=>openUpgrade(),'primary'),el('p',{class:'tiny'},'Connect your account from Account. A verified subscription or complimentary admin grant unlocks companions.'));return;}
-    body.append(el('div',{class:'petStage','aria-hidden':'true'},s.prefs.companion==='theme'?art(C.themeById(s.prefs.theme)):el('span',{class:'petFace'},({cat:'😺',robot:'🤖',spark:'✨'})[s.prefs.companion]),el('span',{},'Pause. Play. Back to work.')));
-    const routine=({rally:'Rally cruise: the wheels roll, the car parks, and its headlights glow once.',bridge:'Drone inspection: undock, inspect a decorative console, then return to charge.',observatory:'Solar orbit: a planet makes one circuit of the miniature observatory.'})[s.prefs.theme];
-    if(routine)body.append(el('div',{class:'callout'},el('strong',{},routine),'Choose This world’s character + World routine. Uses a small clear page margin; it will skip when there is not enough space. No conversation text is read by these routines.'));
-    body.append(el('div',{class:'callout'},el('strong',{},'Natural companion · new'),'Use the articulated cat with your current static theme, without a whole room. Progressive idle behavior stays in a protected margin.'),button('Use the natural cat in this theme',()=>settings({idleMode:'natural',livingEnabled:false,companion:'cat'},true),'primary'),selectControl('Natural companion behavior','livingBehavior',[['progressive','Progressive idle behavior'],['subtle','Subtle — blinks and breathing']]));
-    body.append(selectControl('Companion','companion',[['theme','This world’s character'],['cat','Natural cat 🐈'],['robot','Robot emoji 🤖'],['spark','Sparkles ✨']]));
-    const effect=el('select',{'aria-label':'Idle effect',on:{change:e=>{
-      const value=e.target.value;
-      if(value==='bites'&&!s.prefs.wordBitesConsent){info('First enable the Word Bites permission below.',true);e.target.value=s.prefs.idleMode;return;}
-      settings({idleMode:value});
-    }}},el('option',{value:'off'},'Off — no idle monitoring'),el('option',{value:'natural'},'Natural cat — stays in a safe margin'),el('option',{value:'stroll'},'World routine — cats use Natural motion'),el('option',{value:'bites'},'Word Bites — reversible text illusion'));effect.value=s.prefs.idleMode;
-    const natural=s.prefs.idleMode==='natural'||s.prefs.idleMode==='stroll'&&(s.prefs.companion==='cat'||s.prefs.companion==='theme'&&['mooncat','starlit'].includes(s.prefs.theme));
-    body.append(field('Idle effect',effect));
-    if(!natural)body.append(selectControl('Start after inactivity','idleSeconds',[[30,'30 seconds'],[60,'1 minute'],[120,'2 minutes'],[300,'5 minutes']]));
-    else body.append(el('p',{class:'readingNote'},'Natural mode starts with a quiet glance after 45 seconds, becomes more involved at 2 and 4 minutes, and settles at 8–10 minutes. Preview each action immediately in the separate studio.'));
+    body.append(button('← Back to Worlds',()=>changeTab('worlds')),...title('OPTIONAL ADVANCED EFFECTS','Occasional idle effects.','These effects replace the selected scene or companion. They stop when you return to the page.'));
+    if(!access.premium){body.append(el('p',{class:'readingNote'},'Advanced effects require verified Premium access.'),button('Open account',()=>changeTab('account'),'primary'));return;}
+    const routine=({rally:['Rally cruise','An illustrated car follows a clear page margin, parks and briefly lights its headlights.'],bridge:['drone inspection','An illustrated drone inspects a decorative console, then returns to charge.'],observatory:['solar orbit','A small planet follows the orbit of the miniature observatory.']})[s.prefs.theme];
+    if(routine)body.append(el('div',{class:'callout'},el('strong',{},routine[0]),el('p',{},routine[1]+' No conversation text is read.'),button('Start '+routine[0],()=>settings({idleMode:'stroll',companion:'theme',livingEnabled:false,motion:false,livingMotion:false,enabled:true},true),'primary')));
+    else body.append(el('p',{class:'readingNote'},'Rally Garage, Orbital Bridge and Solar Observatory have optional world routines. Select one of those themes in Worlds to see its action here.'));
+    body.append(el('h2',{class:'savedtitle'},'Word Bites'),el('p',{class:'tiny'},'A temporary highlight on a few visible assistant words. Separate text permission is required.'));
     const consent=el('input',{type:'checkbox',checked:s.prefs.wordBitesConsent,on:{change:e=>{const allowed=e.target.checked;settings({wordBitesConsent:allowed,...(!allowed&&s.prefs.idleMode==='bites'?{idleMode:'off'}:{})},true);}}});
     body.append(el('label',{class:'switch'},el('span',{},'Allow Word Bites on visible assistant text',el('div',{class:'detail'},'Optional: examines short, visible assistant text locally to pick up to three words. No sampled text is saved or transmitted. Your draft, links, code and user messages are excluded.')),consent));
-    body.append(el('div',{class:'callout'},el('strong',{},'An illusion, not an edit.'),'Only the text’s temporary visual highlight changes. Moving the mouse, typing, scrolling or switching tabs restores it immediately. Each appearance ends by itself, with one run per idle spell.'));
-    body.append(el('div',{class:'row'},button(natural?'Preview natural motion — no waiting':'Preview on chat in 3 seconds',async()=>{
-      if(natural){chrome.tabs.create({url:chrome.runtime.getURL('motion-preview.html')});return;}
-      if(DEMO){info('This panel fixture does not control a real ChatGPT tab.');return;}
-      try{const reply=await chrome.runtime.sendMessage({scope:'mooddock',kind:'idle-preview'});if(!reply?.ok)throw new Error(reply?.error||'Could not start preview.');info('Preview armed. Keep the mouse still for 3 seconds; activity cancels it.');}catch(e){info(e.message,true);}
-    },'primary'),button('Turn idle effects off',()=>settings({idleMode:'off'},true))));
-    body.append(el('p',{class:'readingNote'},'Reduced-motion settings, hidden tabs, text selection, visible generation controls, modal dialogs and playing media suppress idle effects. Unknown UI states may need additional compatibility fixes. Access is controlled by your verified subscription or complimentary admin grant. Natural mode uses its progressive timing; the separate legacy effects use the selected inactivity threshold.'));
+    const effect=el('select',{'aria-label':'Idle effect',on:{change:e=>{
+      const value=e.target.value;
+      if(value==='bites'&&!s.prefs.wordBitesConsent){info('First enable the Word Bites permission above.',true);e.target.value='off';return;}
+      settings({idleMode:value,livingEnabled:false,motion:false,livingMotion:false,enabled:true},true);
+    }}},el('option',{value:'off'},'Off'),el('option',{value:'bites'},'Word Bites'));effect.value=s.prefs.idleMode==='bites'?'bites':'off';
+    body.append(field('Idle effect',effect,'Starting Word Bites replaces the current animated scene or companion. Selecting a world returns to its chosen motion.'),selectControl('Start after inactivity','idleSeconds',[[30,'30 seconds'],[60,'1 minute'],[120,'2 minutes'],[300,'5 minutes']]));
+    body.append(el('div',{class:'callout'},el('strong',{},'A reversible visual effect.'),'Only temporary highlights change. Moving the mouse, typing, scrolling or switching tabs restores the words immediately. Each appearance ends by itself, with one run per idle spell.'));
+    body.append(button('Preview on chat in 3 seconds',async()=>{
+      if(DEMO){info('This panel preview does not control a real ChatGPT tab.');return;}
+      if(s.prefs.idleMode!=='stroll'&&(s.prefs.idleMode!=='bites'||!s.prefs.wordBitesConsent)){info('Start a world routine, or allow and select Word Bites first.',true);return;}
+      try{const reply=await chrome.runtime.sendMessage({scope:'mooddock',kind:'idle-preview'});if(!reply?.ok)throw new Error(reply?.error||'Could not start preview.');info('Preview armed. Return to ChatGPT and keep the mouse still for 3 seconds; activity cancels it.');}catch(e){info(e.message,true);}
+    },'primary'));
+    body.append(el('p',{class:'readingNote'},'Reduced motion, hidden tabs, text selection, generation controls, dialogs and playing media suppress the effect. Saved appearances and backups never grant this permission.'));
   }
   function switchTool(next){if(noteDirty){info('Save your notes before switching tools.',true);return;}tool=next;render();}
   function renderTools(){
@@ -315,7 +378,7 @@
     body.append(el('p',{class:'readingNote'},'No sound or background notifications. The deadline is saved locally and the display catches up when a tab wakes. Closing every ChatGPT tab does not send you a reminder.'));
   }
   function updateClock(){const clocks=shadow.querySelectorAll('[data-clock]');const left=s.timerUntil?Math.max(0,Math.ceil((s.timerUntil-Date.now())/1000)):1500;for(const c of clocks)c.textContent=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');const label=shadow.querySelector('[data-timer-label]');if(label)label.textContent=s.timerUntil?(left?'A little uninterrupted time.':'Session complete. Take a breath.'):'Choose a session below.';}
-  function downloadAppearance(){const blob=new Blob([JSON.stringify({format:'chatdrobe-appearance',version:1,prefs:s.prefs},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=el('a',{href:url,download:'chatdrobe-appearance.json'});shadow.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);info('Appearance exported. Notes and prompts are not included.');}
+  function downloadAppearance(){const blob=new Blob([JSON.stringify({format:'chatdrobe-appearance',version:1,prefs:desiredPrefs},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=el('a',{href:url,download:'chatdrobe-appearance.json'});shadow.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);info('Saved appearance exported. Notes and prompts are not included.');}
 
   function renderAccount(){
    body.append(...title('ACCOUNT · STRIPE SANDBOX','Your Premium access.','Connect to your ChatDrobe account. No ChatGPT messages, notes or prompts are sent.'));
@@ -325,25 +388,36 @@
    body.append(el('p',{class:'readingNote'},'This build accepts signed subscriber access or complimentary administrator access. There is no tester override. Once your account is connected and verified, Premium worlds apply directly. Access may remain cached for up to ten minutes after server-side cancellation; local disconnect locks it immediately.'));
   }
   function renderAbout(){
-    body.append(...title('AN INDEPENDENT PROJECT','A useful free version.','A paid version worth choosing—not a paywall around comfortable reading.'));
-    body.append(el('div',{class:'callout'},el('strong',{},'Sandbox build · 0.7.0'),'Free mode is the default. Premium unlocks from a linked account with a verified test subscription or current administrator access. Admin Premium is complimentary; no live payments or tester override.'));
+    body.append(...title('AN INDEPENDENT PROJECT','Your local workspace.','Themes, reading controls and tools, with optional Premium scenes and companions.'));
+    const version=!DEMO&&chrome.runtime.getManifest?chrome.runtime.getManifest().version:'preview';
+    body.append(el('div',{class:'callout'},el('strong',{},'Sandbox build · '+version),'Free mode is the default. Premium unlocks from a linked account with a verified test subscription or current administrator access. Admin Premium is complimentary; no live payments or tester override.'));
     body.append(el('div',{class:'two'},el('div',{class:'plan'},el('h3',{},'Free'),el('div',{class:'price'},'$0'),el('p',{},'No subscription required'),el('div',{class:'bulletline'},'11 original starter worlds'),el('div',{class:'bulletline'},'All reading controls'),el('div',{class:'bulletline'},'50 prompts · 25 shortcuts'),el('div',{class:'bulletline'},'Notes + focus timer')),el('div',{class:'plan'},el('h3',{},'Premium / Plus'),el('div',{class:'price'},'$29/year'),el('p',{},'Annual plan · sandbox testing only'),el('div',{class:'bulletline'},'Full premium world library'),el('div',{class:'bulletline'},'Idle companions + Word Bites'),el('div',{class:'bulletline'},'Living rooms + weather + journeys'),el('div',{class:'bulletline'},'Three Living environments'))));
-    body.append(el('p',{class:'readingNote'},'* Planned features, not implemented in this beta. Cross-device sync is not included.'));
+    body.append(el('p',{class:'readingNote'},'Cross-device sync is not included. Each browser profile keeps its own local data.'));
     if(!access.premium)body.append(button('Explore Premium',()=>openUpgrade(),'primary'));
     const siteLinks=ChatDrobeAccess.websiteLinks();
     body.append(el('div',{class:'row'},...Object.entries({home:'ChatDrobe website ↗',premium:'Premium details ↗',help:'Help ↗'}).filter(([name])=>siteLinks[name]).map(([name,label])=>el('a',{href:siteLinks[name],target:'_blank',rel:'noopener noreferrer',referrerpolicy:'no-referrer'},label))));
     if(ChatDrobeCommerceConfig.channel==='private-beta'&&ChatDrobeCommerceConfig.allowTesterPreview)body.append(el('div',{class:'callout'},el('strong',{},'Private testing only'),el('p',{},'This deliberately bypasses payment for this test package. It does not claim a purchase and is not enabled by appearance imports.'),button(access.testerPreview?'Turn off tester preview':'Enable private tester preview',()=>testerPreview(!access.testerPreview),'ghost')));
     body.append(el('hr',{class:'rule'}),el('h2',{class:'savedtitle'},'Your appearance, portable'));
-    const file=el('input',{type:'file',accept:'.json,application/json','aria-label':'Import appearance JSON',on:{change:async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>10000)throw new Error('Choose a JSON file smaller than 10 KB.');const prefs=C.importAppearance(await f.text());await settings(prefs,true);}catch(err){info(err.message,true);}}}});
+    const file=el('input',{type:'file',accept:'.json,application/json','aria-label':'Import appearance JSON',on:{change:async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>10000)throw new Error('Choose a JSON file smaller than 10 KB.');const prefs=C.importAppearance(await f.text());if(await settings(prefs,true)){motionChoice=P.experience(s.prefs).motion;await checkPageExperience();}}catch(err){info(err.message,true);}}}});
     body.append(button('Export appearance JSON',downloadAppearance),field('Import appearance',file),el('p',{class:'tiny'},'Only validated appearance settings. No scripts, images, prompts, notes, or payment status. Importing or applying a saved workspace never grants Word Bites permission.'));
     body.append(button('Export local data backup',()=>{
       if(!window.confirm('This backup includes your saved notes, prompts and chat shortcuts. Save it privately; do not upload it to public bug reports.'))return;
-      const url=URL.createObjectURL(new Blob([JSON.stringify({format:'chatdrobe-local-backup',version:1,state:s},null,2)],{type:'application/json'}));
+      const url=URL.createObjectURL(new Blob([JSON.stringify({format:'chatdrobe-local-backup',version:1,state:{...s,prefs:desiredPrefs}},null,2)],{type:'application/json'}));
       const a=el('a',{href:url,download:'chatdrobe-local-backup.json'});shadow.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);info('Local data backup exported. Keep it private.');
     }));
+    const backup=el('input',{type:'file',accept:'.json,application/json','aria-label':'Restore local data backup',on:{change:async e=>{
+      try{
+        const file=e.target.files[0];if(!file)return;
+        if(file.size>16*1024*1024)throw new Error('Choose a backup smaller than 16 MB.');
+        const restored=C.importBackup(await file.text());
+        if(!window.confirm(`Replace this browser’s notes, ${s.prompts.length} prompts, ${s.bookmarks.length} shortcuts and ${s.presets.length} saved workspaces with this backup? Export your current backup first if you need to keep it.`))return;
+        if(await mutate({type:'restore-backup',value:restored},true)){motionChoice=P.experience(s.prefs).motion;info('Backup restored locally. Timer stopped. Word Bites permission is off. Premium settings still require verified access.');}
+      }catch(error){info(error.message||'Could not restore this backup.',true);}finally{e.target.value='';}
+    }}});
+    body.append(field('Restore local data backup',backup,'Replaces local notes, prompts, shortcuts, saved workspaces and appearance. Account access and text-inspection permission are never imported. Active focus timers are stopped.'));
     body.append(el('hr',{class:'rule'}),el('h2',{class:'savedtitle'},'Privacy & recovery'),el('p',{class:'notice'},'This build has no analytics. Linking an account enables account-only requests to www.chatdrobe.com and periodic entitlement refreshes. No messages or local notes are sent. Website links open www.chatdrobe.com only when you click them; the site receives a normal browser visit, not your ChatDrobe notes or conversations. It stores only what you save into ChatDrobe plus appearance preferences, the timer, and local aggregate focus-session totals. It does not run ChatGPT requests. The optional Word Bites effect briefly examines small visible assistant-text fragments in memory. It never stores or transmits that text; with the effect off, no text scan runs. Data is local, not encrypted, and shared across accounts using the same browser profile.'));
     body.append(el('div',{class:'row'},button('Restore original appearance',()=>mutate({type:'reset'},true)),button('Delete all ChatDrobe data',async()=>{if(window.confirm('Delete your saved ChatDrobe prompts, notes, shortcuts, workspaces, and timer from this browser? This cannot be undone.')){await mutate({type:'wipe'},true);}},'ghost danger')));
-    if(SIDE)body.append(button('Check active ChatGPT tab',async()=>{try{const reply=await chrome.runtime.sendMessage({scope:'mooddock',kind:'diagnostics'});if(!reply?.ok)throw new Error(reply?.error||'No active ChatGPT tab found.');info(`Page: ${reply.stats.applyCount} applies, ${reply.stats.writeCount} writes, ${reply.stats.extraDOMNodes} scene. Root observer: ${reply.stats.rootAppearanceObserver?'on':'off'}. Living: ${reply.living?.reason||'Off'} (${reply.living?.sceneNodes||0} scene nodes). Idle: ${reply.idle?.running?'running':reply.idle?.enabled?'armed':'off'}; module ${reply.idle?.loaded?'loaded':'not loaded'}.`);}catch(e){info(e.message,true);}}));
+    if(SIDE)body.append(button('Check active ChatGPT tab',()=>checkPageExperience()));
     body.append(el('p',{class:'readingNote'},'ChatDrobe is a working codename, not a cleared trademark. Independent of OpenAI. Not an official ChatGPT feature. Browser-only: does not skin the mobile or desktop apps.'));
   }
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&open&&e.composedPath().includes(root)){e.stopPropagation();setOpen(false);}if(DEMO&&e.altKey&&e.shiftKey&&e.code==='KeyM'){e.preventDefault();setOpen(!open);}},true);
@@ -361,8 +435,8 @@
   if(!DEMO){
     chrome.runtime.onMessage.addListener((msg,sender,respond)=>{if(sender.id===chrome.runtime.id&&msg?.scope==='mooddock'&&msg.kind==='toggle'){setOpen(!open);respond({ok:true});}});
     window.addEventListener('focus',()=>{chrome.runtime.sendMessage({scope:'mooddock',kind:'billing-refresh'}).catch(()=>{});});
-    chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&(changes.mooddock||changes['chatdrobe:access-beta-v1']||changes['chatdrobe:billing-v1'])){const before=access.premium,source=access.accessSource;request('read').then(data=>{s=data;apply();if((before!==access.premium||source!==access.accessSource)&&['worlds','living','account','play'].includes(tab))render();}).catch(()=>{});/* Never redraw unsaved notes, prompts or reading controls. */}});
+    chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&(changes.mooddock||changes['mooddock:prefs-v2']||changes['chatdrobe:access-beta-v1']||changes['chatdrobe:billing-v1'])){const before=access.premium,source=access.accessSource,prefsBefore=JSON.stringify(s.prefs);request('read').then(data=>{s=data;apply();if(before!==access.premium||source!==access.accessSource||prefsBefore!==JSON.stringify(s.prefs)){motionChoice=P.experience(s.prefs).motion;pageStatus=null;if(['worlds','living','account','play'].includes(tab))render();}}).catch(()=>{});/* Never redraw unsaved notes, prompts or reading controls. */}});
   } else window.addEventListener('storage',e=>{if(e.key==='mooddock-demo'){try{s=C.state(JSON.parse(e.newValue||'{}'));apply();}catch{}}});
-  try{s=await request('read');apply();render();panel.hidden=!open;dock.hidden=open;if(DEMO)document.body.dataset.mdPanel=String(open);}
+  try{s=await request('read');if(DEMO)desiredPrefs=s.prefs;motionChoice=P.experience(s.prefs).motion;apply();render();panel.hidden=!open;dock.hidden=open;if(DEMO)document.body.dataset.mdPanel=String(open);}
   catch(err){info(err.message,true);panel.hidden=false;dock.hidden=true;open=true;render();}
 })();

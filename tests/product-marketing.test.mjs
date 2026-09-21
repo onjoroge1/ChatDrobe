@@ -2,7 +2,17 @@ import test from 'node:test';import assert from 'node:assert/strict';import fs f
 import {counts,featuresPage,premiumPage,pricingPage,upgradeLegacyCopy} from '../src/product.mjs';
 const themes=JSON.parse(fs.readFileSync('src/themes.json'));const config=JSON.parse(fs.readFileSync('site.config.json'));
 test('static theme counts remain separate from the three additional Living environments',()=>{assert.deepEqual(counts(themes),{total:15,free:11,plus:4,palettes:30});});
-test('legacy copy is upgraded from the catalog without claiming all Premium access is unlocked',()=>{assert.equal(upgradeLegacyCopy('All 12 worlds unlocked. Explore all 12 worlds. 12 original worlds. 8 complete original worlds.',themes),'11 Free worlds · Premium tester preview. Explore all 15 worlds. 15 original worlds. 11 complete original worlds.');});
+test('legacy copy is upgraded from the catalog without claiming all Premium access is unlocked',()=>{assert.equal(upgradeLegacyCopy('All 12 worlds unlocked. Explore all 12 worlds. 12 original worlds. 8 complete original worlds.',themes),'11 Free worlds · Premium account access. Explore all 15 worlds. 15 original worlds. 11 complete original worlds.');});
 test('features page separates existing beta functionality from planned work',()=>{const h=featuresPage(themes);for(const name of ['Rally Garage cruise','Orbital Bridge drone','Solar Observatory orbit','Word Bites','Advanced scene editor','Scheduled worlds','Private beta','Planned'])assert.ok(h.includes(name));});
 test('Premium includes four static themes and three Living environments',()=>{const h=premiumPage(themes);for(const name of ['Starlit Cat','Mecha Reactor','Neon Sentinel','Retro Arcade','Rainy Tokyo Loft','Starship Journey','Cozy Train Journey'])assert.ok(h.includes(name));});
 test('pricing displays $29 per year without proposed while checkout remains clearly unavailable',()=>{const h=pricingPage(themes,config);assert.match(h,/\$29 <span>\/ year<\/span>/);assert.doesNotMatch(h,/proposed/i);assert.match(h,/No payment is being collected/);assert.match(h,/Checkout is not enabled yet/);assert.match(h,/11 original worlds/);assert.match(h,/4 premium-preview worlds/);assert.doesNotMatch(h,/Buy now|Subscribe now|Start checkout/i);});
+
+test('every built setup surface uses the current gallery and never sends users to a tester bypass',()=>{
+ const release=JSON.parse(fs.readFileSync('release.json'));
+ for(const route of ['/install/','/help/','/premium/','/living-worlds/','/themes/','/changelog/']){
+  const html=fs.readFileSync(`dist${route}index.html`,'utf8');
+  assert.ok(html.includes(release.extension.version),route);assert.match(html,/Worlds/);
+  assert.doesNotMatch(html,/Enable private tester preview|extension 0\.[456]\.|Living tab|Enable it separately/,route);
+ }
+ const account=fs.readFileSync('dist/assets/account-link-ui.js','utf8');assert.ok(account.includes('v'+release.extension.version));assert.doesNotMatch(account,/__EXTENSION_VERSION__/);
+});

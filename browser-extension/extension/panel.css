@@ -26,5 +26,6 @@ button:disabled{opacity:.6;cursor:wait;}button{color:inherit;}a{color:var(--ui-a
 
 .lockBadge{position:absolute;right:7px;top:7px;border-radius:12px;padding:3px 7px;background:#242b25;color:#e4f494;font:600 9px/1.3 system-ui}.world{position:relative}
 
-/* Living Worlds tab: six compact controls, no extra scrolling application. */
+/* A single gallery owns world and motion selection. Details remain secondary. */
 nav{flex-wrap:wrap}nav button{padding-inline:8px!important;font-size:12px!important}
+.motionChoice{margin:16px 0}.motionOptions{display:flex;gap:5px}.motionOptions button{flex:1;border:1px solid var(--ui-line);border-radius:9px;padding:9px 7px;background:var(--ui-surface);color:var(--ui-text);font-size:12px}.motionOptions button[aria-pressed=true]{border-color:var(--ui-accent);background:var(--ui-soft);font-weight:750}.motionChoice .tiny{margin-top:7px}.experienceStatus{padding:11px;border:1px solid var(--ui-line);border-radius:11px;background:var(--ui-soft);font-size:11px;line-height:1.55}.experienceStatus button{margin-top:8px}.worlddetail{display:block;color:var(--ui-muted);font-size:10px;line-height:1.45;margin-top:6px}.worldmeta{flex-wrap:wrap}.advancedLinks{margin-top:16px}.scenePreview{position:absolute;inset:0}.previewLabel{position:absolute;left:5px;bottom:5px;background:var(--ui-surface);color:var(--ui-muted);padding:2px 4px;font-size:8px;border-radius:3px}.check{color:#27312b}.world:focus-visible,.motionOptions button:focus-visible{outline:3px solid var(--ui-accent);outline-offset:3px}

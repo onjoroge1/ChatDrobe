@@ -1,26 +1,25 @@
-ChatDrobe v0.7.0 — Natural Motion / Premium test build
+ChatDrobe 0.8.0 — private sandbox review build
 
 UPDATE AN EXISTING INSTALLATION
-Back up important notes and your existing extension folder. Extract this ZIP, then replace the runtime files inside the SAME folder already loaded in Chrome. Reload the existing ChatDrobe card at chrome://extensions, refresh ChatGPT, and confirm About shows 0.7.0. The ZIP has manifest.json at its top level. Do not uninstall, clear storage or revoke your existing account connection just to update.
+Export a full backup from Tools. Keep the folder already loaded in Chrome. Extract the review ZIP and replace runtime files in that SAME folder, reload its existing card at chrome://extensions, then refresh ChatGPT. Confirm About reports 0.8.0. Do not uninstall or clear storage to update. The ZIP has manifest.json at its root.
 
-Existing account/login, signing configuration, Premium verification and local-data modules are unchanged from v0.6.2. No Vercel changes or new key are required by this update. An existing valid account connection is preserved by updating in place. Expired access is still refreshed/verified normally; no local Premium bypass is included.
+FIRST INSTALLATION
+Extract the ZIP to a permanent folder. Open chrome://extensions, enable Developer mode, choose Load unpacked, and select the folder containing manifest.json. Open ChatGPT and the ChatDrobe side panel from Chrome's extension action.
 
-INSPECT THE NEW MOTION WITHOUT WAITING
-Open Living -> Preview the motion — no waiting. Choose a performance and Play. Use Companion close-up or the still-pose slider to inspect the articulated cat. The studio is a separate preview tab, not information added over your ChatGPT conversation. Its motion runs only when requested. Real workspace activity cancels idle actions; preview controls deliberately do not.
+CHOOSE ONE EXPERIENCE
+In Worlds choose Still, Subtle or Playful, then select a theme, Living World or natural cat companion. The selection applies that experience and motion level together. It replaces the previous experience. Match the light/dark appearance beside the gallery to the card you want. Review the page status after applying; a saved choice does not guarantee that ChatGPT has space to display it.
 
-USE IT IN A LIVING WORLD
-Choose Rainy Tokyo Loft or Cozy Train Journey and Enter world. Enable Ambient scene motion explicitly. Set Companion behavior to Progressive; keep Quiet during focus on for productive sessions. Return focus to the ChatGPT page. With no input, brief noticing begins after 45 seconds; grooming becomes eligible after 2 minutes, stretch/knead after 4, and curling/docking after 8. At most one short routine runs between long quiet gaps. The companion then sleeps with automatic motion stopped by 10 minutes. Inactivity may mean reading; use Subtle or switch motion off when appropriate.
+WHEN A WORLD CANNOT BE DISPLAYED
+Scenes use a safe margin outside messages and the composer. A compact scene is used when only a small safe margin remains. If there is no safe margin, the page status explains the blockage. Collapse ChatGPT's sidebar, widen the browser, or choose a theme. The extension does not cover the conversation or silently reduce your reading width.
 
-USE THE CAT WITH A STATIC PREMIUM THEME
-Select a theme such as Starlit Cat. In Play choose Use the natural cat in this theme. This explicitly enables a compact in-place cat in a protected margin without a full room. Select Progressive or Subtle behavior. Existing opted-in cat walk routines also use this rig; merely importing an appearance or enabling decorative bobbing does not activate idle monitoring.
+MOTION IS A PREFERENCE, NOT A PROMISE OF CONSTANT MOVEMENT
+Still disables motion. Subtle and Playful allow short activity between quiet gaps; Playful allows more involved idle behavior. Input, selected text, response streaming, native media, reduced-motion settings, Quiet Focus, and hidden/unfocused tabs can pause it. The page status reports these reasons. Return focus to ChatGPT to observe idle motion. Inactivity can mean reading; choose Still whenever appropriate. The motion studio is a separate simulated preview.
 
-PRODUCTIVITY AND SAFETY
-Input cancels the current performance immediately and motion waits 10 seconds after input before gently settling. Selection, composition, supported response-streaming controls, native media playback, Quiet Focus, reduced motion, hidden/unfocused tabs and unsafe placement suppress motion. No walking across messages, overlay labels, counters, pop-ups, sound, transcript inspection or activity-history storage was added. Native control detection and safe placement still need testing in your current signed-in ChatGPT layout.
+ACCOUNT CONNECTION
+Choose a Premium experience and follow Sign in / connect account. Allow optional www.chatdrobe.com access, sign in through the approval link, and approve the matching code. Return to the extension and refresh access. The extension verifies the signed entitlement before activating the saved choice. A linked device shown on the website does not prove this installation has connected. Public email sign-in and live checkout depend on server setup and are not enabled by this build.
 
-ATMOSPHERE RECIPES
-Living includes Rainy writing, Deep-space focus and Snowy window seat. These select existing worlds/weather/lighting; they do not enable motion, start a focus timer or change saved notes. Follow focus journey now persists correctly as a lighting preference.
+ACCESS AND LOCAL DATA
+Administrators retain complimentary Premium. Test subscribers require a verified test subscription. Valid signed access lasts at most ten minutes and refreshes periodically; a temporary error does not extend that expiry. An expired device link may require reconnection. Settings, notes and saved work stay local. Appearance imports and restored backups do not grant permission to sample page text. Export backups before updating; account recovery does not recover your local workspace.
 
-FIRST ACCOUNT CONNECTION (ONLY IF NOT ALREADY CONNECTED)
-Select a Premium world and Sign in / connect account. Allow optional www.chatdrobe.com access, open the prefilled approval link, sign in and approve the matching code. Return to the extension, refresh if necessary, and use Open ChatGPT after Premium is verified. Administrators retain complimentary Premium. Identity/device links may last up to 30 days; signed access still expires within ten minutes and refreshes periodically.
-
-All 15 static themes and 3 Living environments remain. Permissions, billing destinations and public signing key are unchanged. No private key or provider secret is included. This sandbox test package is not a public live-payment or Chrome Web Store release.
+REVIEW SCOPE
+This is not a public live-payment or Chrome Web Store release. Native installed Chrome, the current signed-in ChatGPT layout and real Stripe sandbox account recovery remain release acceptance checks. See docs/PREMIUM-REPAIR-ACCEPTANCE.md in the source repository.

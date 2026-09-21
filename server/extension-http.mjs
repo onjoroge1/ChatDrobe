@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto';
+import {isIP} from 'node:net';
 import {AccountError,validSecret,hash} from './accounts-policy.mjs';
 import {BillingError} from './security.mjs';
 import {privateHeaders} from './accounts-http.mjs';
@@ -6,6 +7,12 @@ import {bindDeviceLease} from './device-lease.mjs';
 import {accessSigningConfiguration,adminDeviceLease} from './premium-membership.mjs';
 const known=new Set(['start','poll','entitlement','disconnect']);
 function json(res,status,value){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(value));}
+export function extensionClientIp(req,vercelProxy=process.env.VERCEL==='1'){
+ const forwarded=req.headers['x-vercel-forwarded-for'];
+ // Vercel supplies this header. A directly hosted/local server must use its socket
+ // peer, otherwise an attacker can choose a fresh quota bucket on every request.
+ return vercelProxy&&typeof forwarded==='string'&&isIP(forwarded)?forwarded:req.socket?.remoteAddress||'unknown';
+}
 export async function deviceEntitlement(rt,id){
  let device=await rt.devices.device(id);
  const connectionExpiresAt=Math.floor(new Date(device.expires_at).getTime()/1000);
@@ -22,7 +29,7 @@ export async function deviceEntitlement(rt,id){
  const lease=bindDeviceLease(dependencies.config,result,id,device.expires_at);
  return {...lease,linked:true,account:{email:device.email},billingEnabled:true,connectionExpiresAt,cancelAtPeriodEnd:result.cancelAtPeriodEnd};
 }
-export function createExtensionHandler(runtime){return async(req,res)=>{
+export function createExtensionHandler(runtime,{vercelProxy=process.env.VERCEL==='1'}={}){return async(req,res)=>{
  privateHeaders(res);const requestId=randomUUID();
  try{
   const action=new URL(req.url,'https://extension.invalid').searchParams.get('action');if(!known.has(action))throw new AccountError('NOT_FOUND','Unknown extension action.',404);
@@ -37,10 +44,10 @@ export function createExtensionHandler(runtime){return async(req,res)=>{
   let size=0;const chunks=[];for await(const c of req){size+=c.length;if(size>1024)throw new AccountError('BODY_TOO_LARGE','Request too large.',413);chunks.push(c);}
   let input;try{input=JSON.parse(Buffer.concat(chunks).toString('utf8')||'{}');}catch{throw new AccountError('INPUT','Invalid request.');}
   if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).some(k=>action!=='start'||k!=='extensionId'))throw new AccountError('INPUT','Unexpected extension request field.');
-  const id=hash(secret),rt=await runtime();
+  const id=hash(secret),rt=await runtime(),ip=extensionClientIp(req,vercelProxy);
+  await rt.devices.limitRequest(ip);
   if(action==='start'){
    if(origin&&origin!=='chrome-extension://'+input.extensionId)throw new AccountError('ORIGIN','Extension origin does not match.',403);
-   const ip=typeof req.headers['x-vercel-forwarded-for']==='string'?req.headers['x-vercel-forwarded-for'].slice(0,128):req.socket?.remoteAddress||'unknown';
    const result=await rt.devices.start(id,input.extensionId,ip);json(res,200,{...result,verificationUrl:rt.web.origin+'/account/#link='+encodeURIComponent(result.code)});return;
   }
   if(action==='disconnect'){await rt.devices.disconnect(id);json(res,200,{ok:true});return;}

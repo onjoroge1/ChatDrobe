@@ -52,9 +52,9 @@ try:
             assert live['x']>=chat['x']+chat['width'],(live,chat)
             page.get_by_role('button',name='Rainy Tokyo Loft',exact=True).click();expect(room).to_have_attribute('data-world','tokyo')
             page.get_by_label('Atmosphere',exact=True).select_option('snow');expect(room).to_have_attribute('data-weather','snow')
-            page.get_by_label('Session moment').select_option('USER_IDLE');expect(room).to_have_attribute('data-idle','true')
+            page.get_by_label('Session moment').select_option('USER_IDLE');expect(room).to_have_attribute('data-idle','false')
+            page.get_by_role('button',name='Enable motion',exact=True).click();expect(room).to_have_attribute('data-idle','true')
             page.get_by_label('Session moment').select_option('USER_RETURNED');expect(room).to_have_attribute('data-idle','false')
-            page.get_by_role('button',name='Enable motion',exact=True).click()
             page.get_by_label('Session moment').select_option('FOCUS_STARTED');expect(room).to_have_attribute('data-focused','true')
             assert room.locator('.snow').evaluate('(e)=>getComputedStyle(e).animationPlayState')=='paused'
             page.emulate_media(reduced_motion='reduce');expect(preview).to_have_attribute('data-motion','false')

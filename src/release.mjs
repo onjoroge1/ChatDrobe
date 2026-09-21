@@ -47,7 +47,7 @@ export function finalizeSite(output,config,routes,env=process.env){
    html=html.replace('<h2>Install the test build</h2>',options+'<h2>Install the test build</h2>').replace('The package is currently shared directly with testers. Use the ZIP already provided to you. A public download will appear here only after the release URL is configured and verified.','Release links are provided below. The beta is still subject to the testing limitations in this guide.');
   }
   // Access wording must remain truthful regardless of earlier count rewrites.
-  fs.writeFileSync(file,html.replace(/All \d+ worlds unlocked/g,`${freeCount} Free worlds · Premium tester preview`));
+  fs.writeFileSync(file,html.replace(/All \d+ worlds unlocked/g,`${freeCount} Free worlds · Premium account access`));
  }
  fs.writeFileSync(path.join(output,'robots.txt'),settings.indexable?`User-agent: *\nAllow: /\nSitemap: ${settings.origin}/sitemap.xml\n`:'User-agent: *\nDisallow: /\n');
  if(settings.origin)fs.writeFileSync(path.join(output,'sitemap.xml'),'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(r=>`<url><loc>${escape(settings.origin+r)}</loc></url>`).join('')+'</urlset>\n');

@@ -7,7 +7,7 @@ test('Vercel invocation outside the package root is rejected',t=>{const dir=fixt
 test('local direct invocation stays anchored to the source root',t=>{const dir=fixture(t);assert.equal(buildContext(dir,{cwd:path.join(dir,'tests'),env:{}}).output,path.join(dir,'dist'));});
 test('output verification rejects absent and empty artifacts',t=>{const dir=fixture(t);assert.throws(()=>verifyBuildOutput(dir),/Missing or empty/);fs.writeFileSync(path.join(dir,'index.html'),'');assert.throws(()=>verifyBuildOutput(dir),/Missing or empty.*index.html/);});
 test('a clean hosted-like build writes and verifies the explicit complete deployment inventory',t=>{
- const dir=fixture(t);for(const entry of ['scripts','src','site.config.json','package.json','vercel.json'])fs.cpSync(path.join(root,entry),path.join(dir,entry),{recursive:true});
+ const dir=fixture(t);for(const entry of ['scripts','src','site.config.json','release.json','browser-extension/extension','package.json','vercel.json'])fs.cpSync(path.join(root,entry),path.join(dir,entry),{recursive:true});
  const env={...process.env,VERCEL:'1',VERCEL_ENV:'preview',INIT_CWD:dir,SITE_INDEXABLE:'false'};delete env.SITE_URL;
  const result=spawnSync(process.execPath,['scripts/build.mjs'],{cwd:dir,env,encoding:'utf8',timeout:15000});assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/Verified deployable output at/);assert.equal(verifyBuildOutput(path.join(dir,'dist')),7);
  const manifest=JSON.parse(fs.readFileSync(path.join(dir,'dist/build-manifest.json'))),themes=JSON.parse(fs.readFileSync(path.join(dir,'src/themes.json')));

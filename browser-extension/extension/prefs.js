@@ -7,17 +7,29 @@ const FONTS=Object.freeze({system:'system-ui, -apple-system, BlinkMacSystemFont,
 const bool=(v,d)=>typeof v==='boolean'?v:d;
 const numeric=(v,lo,hi,d)=>typeof v==='number'&&Number.isFinite(v)?Math.max(lo,Math.min(hi,v)):d;
 const choice=(v,values,d)=>values.includes(v)?v:d;
+const natural=p=>p.idleMode==='natural'||p.idleMode==='stroll'&&(p.companion==='cat'||p.companion==='theme'&&['mooncat','starlit'].includes(p.theme));
 function prefs(value={}){
  const v=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
  const consent=bool(v.wordBitesConsent,false),idle=choice(v.idleMode,['off','stroll','bites','natural'],'off');
- return {enabled:bool(v.enabled,true),theme:THEMES.some(t=>t.id===v.theme)?v.theme:'mooncat',mode:choice(v.mode,['theme','light','dark','system','chatgpt'],'light'),panelMode:choice(v.panelMode,['system','light','dark'],'light'),font:Object.hasOwn(FONTS,v.font)?v.font:'system',fontSize:numeric(v.fontSize,13,24,16),lineHeight:numeric(v.lineHeight,1.3,2.2,1.65),width:numeric(v.width,600,1400,850),focus:bool(v.focus,false),motion:bool(v.motion,false),decoration:bool(v.decoration,true),bubbles:bool(v.bubbles,true),accent:typeof v.accent==='string'&&/^#[a-f0-9]{6}$/i.test(v.accent)?v.accent:'',idleMode:idle==='bites'&&!consent?'off':idle,idleSeconds:choice(v.idleSeconds,[30,60,120,300],60),wordBitesConsent:consent,companion:choice(v.companion,['theme','cat','robot','spark'],'theme'),livingEnabled:bool(v.livingEnabled,false),livingWorld:choice(v.livingWorld,['tokyo','starship','train'],'tokyo'),livingView:choice(v.livingView,['portal','full'],'portal'),livingWeather:choice(v.livingWeather,['clear','rain','snow','fog','aurora'],'rain'),livingTime:choice(v.livingTime,['day','dusk','night','local','journey'],'day'),livingMotion:bool(v.livingMotion,false),livingQuiet:bool(v.livingQuiet,true),livingReactions:bool(v.livingReactions,false),livingBehavior:choice(v.livingBehavior,['progressive','subtle'],'progressive')};
+ const result={enabled:bool(v.enabled,true),theme:THEMES.some(t=>t.id===v.theme)?v.theme:'mooncat',mode:choice(v.mode,['theme','light','dark','system','chatgpt'],'light'),panelMode:choice(v.panelMode,['system','light','dark'],'light'),font:Object.hasOwn(FONTS,v.font)?v.font:'system',fontSize:numeric(v.fontSize,13,24,16),lineHeight:numeric(v.lineHeight,1.3,2.2,1.65),width:numeric(v.width,600,1400,850),focus:bool(v.focus,false),motion:bool(v.motion,false),decoration:bool(v.decoration,true),bubbles:bool(v.bubbles,true),accent:typeof v.accent==='string'&&/^#[a-f0-9]{6}$/i.test(v.accent)?v.accent:'',idleMode:idle==='bites'&&!consent?'off':idle,idleSeconds:choice(v.idleSeconds,[30,60,120,300],60),wordBitesConsent:consent,companion:choice(v.companion,['theme','cat','robot','spark'],'theme'),livingEnabled:bool(v.livingEnabled,false),livingWorld:choice(v.livingWorld,['tokyo','starship','train'],'tokyo'),livingView:choice(v.livingView,['portal','full'],'portal'),livingWeather:choice(v.livingWeather,['clear','rain','snow','fog','aurora'],'rain'),livingTime:choice(v.livingTime,['day','dusk','night','local','journey'],'day'),livingMotion:bool(v.livingMotion,false),livingQuiet:bool(v.livingQuiet,true),livingReactions:bool(v.livingReactions,false),livingBehavior:choice(v.livingBehavior,['progressive','subtle'],'progressive')};
+ // Resolve historic combinations once, so only one renderer owns the experience.
+ if(result.livingEnabled){result.idleMode='off';result.motion=false;}
+ else if(natural(result)){result.motion=false;}
+ else result.livingMotion=false;
+ return result;
 }
+function experience(value){
+ const p=prefs(value),kind=p.livingEnabled?'living':natural(p)?'companion':'theme';
+ const active=kind==='theme'?p.motion:p.livingMotion;
+ return {kind,id:kind==='living'?p.livingWorld:kind==='companion'?'cat':p.theme,motion:active?(p.livingBehavior==='subtle'?'subtle':'playful'):'still'};
+}
+
 const themeById=id=>THEMES.find(t=>t.id===id)||THEMES[0];
 function scheme(p,{nativeDark=false,systemDark=false}={}){return p.mode==='chatgpt'?(nativeDark?'dark':'light'):p.mode==='system'?(systemDark?'dark':'light'):['light','dark'].includes(p.mode)?p.mode:(themeById(p.theme).dark?'dark':'light');}
 function luminance(hex){const a=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return a[0]*.2126+a[1]*.7152+a[2]*.0722;}
 function contrast(a,b){const x=luminance(a),y=luminance(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05);}
 function ink(color){return contrast(color,'#101010')>contrast(color,'#ffffff')?'#101010':'#ffffff';}
-const api=Object.freeze({DEFAULTS,FONTS,prefs,contrast,ink,themeById,scheme});
+const api=Object.freeze({DEFAULTS,FONTS,prefs,experience,contrast,ink,themeById,scheme});
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 root.ChatDrobePrefs=api;
 })(globalThis);

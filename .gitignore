@@ -8,3 +8,5 @@ __pycache__/
 .venv/
 test-results/
 .DS_Store
+artifacts/
+browser-extension/preview/

@@ -4,9 +4,12 @@ const CODE=/^[A-F0-9]{20}$/;
 export function cleanLinkCode(value){return typeof value==='string'?value.toUpperCase().replaceAll('-','').replaceAll(' ',''):'';}
 export function extensionDevices({pool,store,owner,now=()=>Math.floor(Date.now()/1000)}){
  async function transaction(fn){const c=await pool.connect();try{await c.query('BEGIN');await c.query("SET LOCAL lock_timeout='5s'");const r=await fn(c);await c.query('COMMIT');return r;}catch(e){await c.query('ROLLBACK').catch(()=>{});throw e;}finally{c.release();}}
+ // The HTTP boundary invokes this before creating any per-credential limit rows.
+ // Rotating invented credentials therefore cannot bypass one client's admission budget.
+ async function limitRequest(ip){await store.limit('device-request-ip:'+hash(ip),120,60,now());}
  async function start(credentialHash,extensionId,ip){
   if(!/^[a-p]{32}$/.test(extensionId||''))throw new AccountError('EXTENSION_ID','Unsupported extension identifier.');
-  await store.limit('device-start-global',200,3600,now());await store.limit('device-start-ip:'+hash(ip),10,600,now());
+  await store.limit('device-start-ip:'+hash(ip),10,600,now());await store.limit('device-start-global',200,3600,now());
   await pool.query('DELETE FROM public.chatdrobe_extension_devices WHERE account_id IS NULL AND expires_at<now()');
   const code=randomBytes(10).toString('hex').toUpperCase();
   await transaction(async c=>{
@@ -32,11 +35,14 @@ export function extensionDevices({pool,store,owner,now=()=>Math.floor(Date.now()
   });
  }
  async function device(credentialHash,{pending=false}={}){
-  await store.limit('device-api-global',1200,60,now());await store.limit('device-api:'+credentialHash,30,60,now());
+  // Reject repeated attempts from one credential before they consume shared capacity.
+  await store.limit('device-api:'+credentialHash,30,60,now());
   // The current database role, not a role cached at pairing time, controls complimentary access.
   const row=(await pool.query('SELECT d.*,a.email,a.billing_id,a.role,a.disabled_at FROM public.chatdrobe_extension_devices d LEFT JOIN public.chatdrobe_accounts a ON a.id=d.account_id WHERE d.credential_hash=$1',[credentialHash])).rows[0];
   if(!row||row.revoked_at||row.disabled_at||new Date(row.expires_at).getTime()<=now()*1000||(row.owner_version&&(!owner.ready||row.owner_version!==owner.version)))throw new AccountError('DEVICE_SIGN_IN_REQUIRED','Reconnect this extension to your ChatDrobe account.',401);
   if(!pending&&!row.account_id)throw new AccountError('LINK_PENDING','Approve the matching code on the ChatDrobe website.',409);
+  // Only known, valid devices may spend the shared entitlement/poll quota.
+  await store.limit('device-api-global',1200,60,now());
   return row;
  }
  async function poll(credentialHash){const row=await device(credentialHash,{pending:true});return row.account_id?{linked:true,account:{email:row.email,billingId:row.billing_id}}:{linked:false,pending:true};}
@@ -44,5 +50,5 @@ export function extensionDevices({pool,store,owner,now=()=>Math.floor(Date.now()
  async function revoke(user,id){if(!/^[a-f0-9]{64}$/.test(id||''))throw new AccountError('DEVICE_ID','Invalid device.');await transaction(async c=>{const r=await c.query('UPDATE public.chatdrobe_extension_devices SET revoked_at=now() WHERE credential_hash=$1 AND account_id=$2 AND revoked_at IS NULL RETURNING credential_hash',[id,user.id]);if(r.rowCount)await c.query("INSERT INTO public.chatdrobe_access_audit(account_id,action) VALUES($1,'device_revoked')",[user.id]);});return {ok:true};}
  async function disconnect(id){await pool.query('UPDATE public.chatdrobe_extension_devices SET revoked_at=now() WHERE credential_hash=$1',[id]);return {ok:true};}
  async function revokeAll(user){await pool.query('UPDATE public.chatdrobe_extension_devices SET revoked_at=now() WHERE account_id=$1 AND revoked_at IS NULL',[user.id]);}
- return {start,approve,device,poll,list,revoke,disconnect,revokeAll};
+ return {limitRequest,start,approve,device,poll,list,revoke,disconnect,revokeAll};
 }

@@ -63,21 +63,45 @@ export function react(w,s,event){
  if(action==='signal-off')n.streaming=false;
  return n;
 }
-/* Layout protects the whole conversation band, not just the currently visible paragraph. */
+/* Layout protects the entire measured conversation band, including offscreen messages.
+   Until both reading and composer bounds are known, retain the requested-width guard. */
 export function placement(main,composer,width,view,viewport,reading=null){
- if(!main||main.width<280||viewport.height<380)return {visible:false,reason:'No supported conversation layout.'};
+ const action='Collapse the ChatGPT sidebar, widen the window, or choose a theme.';
+ if(!main||main.width<280||viewport.height<380)return {visible:false,reason:'No supported conversation layout.',action};
  const left=Math.max(0,main.left),right=Math.min(viewport.width,main.right);
  const band=Math.max(600,width,composer?.width||0),center=(left+right)/2;
- const safeLeft=Math.max(left,Math.min(center-band/2-20,reading?.left-20||Infinity)),safeRight=Math.min(right,Math.max(center+band/2+20,reading?.right+20||-Infinity));
+ const bounded=r=>Number.isFinite(r?.left)&&Number.isFinite(r?.right)&&r.right>r.left;
+ const measured=bounded(reading)&&bounded(composer);
+ const protectedLeft=measured?Math.min(reading.left,composer.left):Math.min(center-band/2,bounded(reading)?reading.left:Infinity,bounded(composer)?composer.left:Infinity);
+ const protectedRight=measured?Math.max(reading.right,composer.right):Math.max(center+band/2,bounded(reading)?reading.right:-Infinity,bounded(composer)?composer.right:-Infinity);
+ const safeLeft=Math.min(right,Math.max(left,protectedLeft-20)),safeRight=Math.max(left,Math.min(right,protectedRight+20));
  const bottom=Math.min(viewport.height-24,composer?.top>180?composer.top-20:viewport.height-230);
  const top=86,height=bottom-top;
  const gap=Math.max(safeLeft-left,right-safeRight);
- if(gap<128||height<160)return {visible:false,reason:'Not enough clear margin. Narrow the reading width or use a wider window.'};
- if(view==='portal'){
+ if(gap<80||height<100)return {visible:false,reason:'The world needs more clear margin beside the conversation.',action};
+ const compact=gap<128||height<160;
+ if(view==='portal'||compact){
   const w=Math.min(300,gap-16),h=Math.min(235,height,w*.72+22);
-  return {visible:true,left:right-safeRight>=safeLeft-left?safeRight+8:left+8,top:bottom-h,width:w,height:h,view};
+  return {visible:true,left:right-safeRight>=safeLeft-left?safeRight+8:left+8,top:bottom-h,width:w,height:h,view:'portal',requestedView:view,compact,measured};
  }
- return {visible:true,left,top,width:right-left,height,view,cutLeft:Math.max(0,safeLeft-left),cutRight:Math.min(right-left,safeRight-left)};
+ return {visible:true,left,top,width:right-left,height,view,compact:false,measured,cutLeft:Math.max(0,safeLeft-left),cutRight:Math.min(right-left,safeRight-left)};
+}
+
+/* Diagnostics distinguish visible artwork from motion intentionally held by policy. */
+export function renderStatus(v={}){
+ const suppressionReasons=[];
+ for(const [key,label] of [['reducedMotion','reduced-motion preference'],['composing','text composition'],['selection','text selection'],['media','media playback'],['streaming','a response in progress'],['quietFocus','the focus timer'],['busy','recent input'],['sleep','the companion is asleep']])if(v[key])suppressionReasons.push(label);
+ if(!v.active)suppressionReasons.unshift(v.pageVisible===false?'an inactive ChatGPT tab':'focus outside the ChatGPT page');
+ const common={visible:false,motionRequested:!!v.motion,motionAllowed:false,suppressionReasons};
+ if(!v.enabled)return {...common,state:'off',reason:'World is off.',action:''};
+ if(!v.mounted)return {...common,state:'loading',reason:'Waiting for the ChatGPT page to be ready.',action:''};
+ if(v.dialog)return {...common,state:'paused',reason:'World hidden while a dialog is open.',action:'Close the dialog to show the world.'};
+ if(!v.layout?.visible)return {...common,state:'blocked',reason:v.layout?.reason||'No supported conversation layout.',action:v.layout?.action||'Open a ChatGPT conversation.'};
+ const visible=v.pageVisible!==false;
+ const mode=v.layout.compact?'Compact world':'World';
+ if(!visible)return {...common,state:'paused',reason:'World paused while this ChatGPT tab is inactive.',action:'Return to the ChatGPT tab.'};
+ if(v.motion&&suppressionReasons.length)return {...common,visible:true,state:'paused',reason:`${mode} visible; motion paused for ${suppressionReasons.join(', ')}.`,action:''};
+ return {...common,visible:true,motionAllowed:!!v.motion,state:'displayed',reason:`${mode} displayed${v.motion?'; motion enabled':'; Still selected'}.`,action:''};
 }
 
 export function sceneLighting(time,stage,total,now=Date.now()){if(time==='journey'){const fraction=stage/Math.max(1,total-1);return fraction<.5?'day':fraction<1?'dusk':'night';}return lighting(time,now);}

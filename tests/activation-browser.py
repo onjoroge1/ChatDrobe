@@ -30,14 +30,14 @@ try:
   page.route('**/api/*',api)
   r=page.goto(BASE+'/account/?flow=extension',wait_until='networkidle');assert "connect-src 'self'" in r.headers['content-security-policy']
   card=page.locator('[data-connection-success]');expect(card).to_have_attribute('data-state','setup-required');expect(card.get_by_role('link',name='Open ChatGPT')).to_be_hidden();assert 'entitlement' not in calls
-  state['signing']=True;page.get_by_role('button',name='Check activation',exact=True).click();expect(card).to_have_attribute('data-state','ready');expect(card.get_by_role('link',name='Open ChatGPT')).to_have_attribute('href','https://chatgpt.com/')
+  state['signing']=True;page.get_by_role('button',name='Check activation',exact=True).click();expect(card).to_have_attribute('data-state','needs-connection');expect(card.get_by_role('link',name='Open ChatGPT')).to_have_attribute('href','https://chatgpt.com/')
   page.goto(BASE+'/account/#link='+code,wait_until='networkidle');expect(card).to_have_attribute('data-state','needs-connection');expect(page.get_by_label('Code shown in your extension')).to_have_value(code)
-  page.get_by_label('I started this connection',exact=False).check();page.get_by_role('button',name='Connect this extension',exact=True).click();expect(card).to_have_attribute('data-state','ready');assert state['approved'];expect(page.get_by_label('Code shown in your extension')).to_be_hidden()
+  page.get_by_label('I started this connection',exact=False).check();page.get_by_role('button',name='Connect this extension',exact=True).click();expect(card).to_have_attribute('data-state','needs-extension-check');assert state['approved'];expect(page.get_by_label('Code shown in your extension')).to_be_hidden()
   state['admin']=False;page.goto(BASE+'/account/?checkout=returned',wait_until='networkidle');expect(card).to_have_attribute('data-state','payment-pending');expect(card.get_by_role('link',name='Open ChatGPT')).to_be_hidden()
-  state['paid']=True;page.get_by_role('button',name='Check activation',exact=True).click();expect(card).to_have_attribute('data-state','ready');assert 'entitlement' in calls
+  state['paid']=True;page.get_by_role('button',name='Check activation',exact=True).click();expect(card).to_have_attribute('data-state','needs-connection');assert 'entitlement' in calls
   for width in [360,390,768,1440]:
    page.set_viewport_size({'width':width,'height':1000});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),width
-  assert page.evaluate('violations')==[];assert not errors,errors;b.close();print('5 activation HTTP groups passed: missing signer, ready admin, prefilled consent, failed/verified payment return and responsive/CSP checks.')
+  assert page.evaluate('violations')==[];assert not errors,errors;b.close();print('5 activation HTTP groups passed: missing signer, old-installation ambiguity, account-only approval, failed/verified payment return and responsive/CSP checks.')
 finally:
  server.terminate()
  try:server.wait(timeout=5)

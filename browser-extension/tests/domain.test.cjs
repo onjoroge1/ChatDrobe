@@ -61,7 +61,8 @@ test('account requests require optional exact-origin permission and never add Ch
 test('metadata and About version agree; checkout UI exposes no card input',()=>{
  const version=require('../package.json').version;
  assert.equal(require('../extension/manifest.json').version,version);
- assert.ok(fs.readFileSync(path.join(E,'workspace.js'),'utf8').includes('Sandbox build · '+version));
+ assert.equal(require('../../release.json').extension.version,version);
+ assert.match(fs.readFileSync(path.join(E,'workspace.js'),'utf8'),/chrome\.runtime\.getManifest\?\.\(\)\?\.version|chrome\.runtime\.getManifest\(\)\.version/);
  const html=fs.readFileSync(path.join(E,'upgrade.html'),'utf8');
  assert.match(html,/data-site-link="premium"/);assert.match(html,/id="checkout" disabled/);
  assert.doesNotMatch(html,/<input\b/);assert.match(html,/Rainy Tokyo Loft/);

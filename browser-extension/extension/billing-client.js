@@ -12,9 +12,12 @@
   const newSecret=()=>btoa(String.fromCharCode(...cryptoApi.getRandomValues(new Uint8Array(32)))).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
   async function api(action,credential,input={}){
    let response;try{response=await fetcher(origin+'/api/extension?action='+action,{method:'POST',credentials:'omit',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(10000),headers:{'Content-Type':'application/json',Authorization:'Bearer '+credential},body:JSON.stringify(input)});}catch(error){const e=Error('Could not reach www.chatdrobe.com. Your connection is saved. Check network access and the extension website permission, then retry.');e.code='NETWORK_UNAVAILABLE';throw e;}
-   const body=await response.text();if(body.length>16384)throw Error('Unexpected account-service response.');
-   let value;try{value=JSON.parse(body);}catch{throw Error('Account service unavailable.');}
-   if(!response.ok){const e=Error(value.error?.message||'Account request failed.');e.code=value.error?.code;e.status=response.status;throw e;}return value;
+   const body=await response.text();let value;
+   if(body.length<=16384)try{value=JSON.parse(body);}catch{}
+   // Keep the HTTP status even if an upstream proxy returned HTML or an oversized body.
+   // A denied credential must revoke access; a temporary throttle must not revoke a valid proof.
+   if(!response.ok){const e=Error(value?.error?.message||'Account request failed.');e.code=value?.error?.code;e.status=response.status;throw e;}
+   if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Account service unavailable.');return value;
   }
   async function grant(data){
    if(!data.token||!/^[A-Za-z0-9_-]{43}$/.test(data.secret||''))return {premium:false,testerPreview:false,paid:false,testSubscription:false};
@@ -51,8 +54,8 @@
      await save(data);await schedule(data);return status();
     }catch(e){
      if(ticket!==generation)return status();
-     if(e.status===401){await save({lastError:e.message,lastErrorCode:e.code||''});await schedule({});}
-     else{if(e.status&&e.status<500)data.token=null;data.lastError=e.message;data.lastErrorCode=e.code||(/signing key|signature/i.test(e.message)?'PROOF_INVALID':'');await save(data);await schedule(data);}
+     if(e.status===401||e.status===403){await save({lastError:e.message,lastErrorCode:e.code||''});await schedule({});}
+     else{if(e.status&&e.status<500&&![408,425,429].includes(e.status))data.token=null;data.lastError=e.message;data.lastErrorCode=e.code||(/signing key|signature/i.test(e.message)?'PROOF_INVALID':'');await save(data);await schedule(data);}
      return status();
     }
    })();inflight=task;try{return await task;}finally{if(inflight===task)inflight=null;}

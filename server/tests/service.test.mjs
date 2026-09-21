@@ -15,6 +15,8 @@ test('checkout uses fixed server-side recurring price and exact installation met
  const call=t.provider.calls.find(c=>c.path==='/checkout/sessions');
  assert.equal(call.options.values['line_items[0][price]'],'price_fixture');assert.equal(call.options.values['line_items[0][quantity]'],1);
  assert.equal(call.options.values['metadata[chatdrobe_install]'],t.id);assert.equal(call.options.values.mode,'subscription');
+ assert.equal(call.options.values.expires_at,undefined);assert.equal(call.options.values['payment_method_types[0]'],undefined);
+ assert.equal((await t.store.read(t.id)).intent.requestVersion,2);
  assert.ok(!call.options.values.success_url.includes('secret'));assert.equal((await t.service.refresh(t.id)).plan,'free');
 });
 test('two concurrent checkout clicks create one provider session using a durable intent',async()=>{
@@ -81,4 +83,86 @@ test('billing portal uses authenticated customer mapping, not a client-supplied 
 test('unknown old checkout outcome older than idempotency retention cannot create another charge',async()=>{
  const t=setup();await t.store.mutate(t.id,state=>{state.intent={id:'old',created:t.now-86400,origin:t.config.origin,priceId:t.config.priceId};},{create:true});
  await assert.rejects(t.service.checkout(t.id),{code:'UNCERTAIN_CHECKOUT'});
+});
+
+test('a request lost before provider execution is retryable after thirty minutes with identical parameters',async()=>{
+ const t=setup();let now=t.now,first=true;const attempts=[];
+ const stripe=async(path,options)=>{
+  if(path==='/checkout/sessions'){
+   attempts.push(structuredClone(options));
+   if(first){first=false;throw Error('request lost before execution');}
+   // The old absolute one-hour expiry would now fail Stripe's documented range.
+   if(options.values.expires_at!==undefined)assert.ok(options.values.expires_at-now>=1800&&options.values.expires_at-now<=86400);
+  }
+  return t.provider.stripe(path,options);
+ };
+ const service=billingService({config:t.config,store:t.store,stripe,now:()=>now});
+ await assert.rejects(service.checkout(t.id,'starlit'));
+ const intent=(await t.store.read(t.id)).intent.id;now+=1801;
+ assert.match((await service.checkout(t.id,'reactor')).url,/checkout.stripe.com/);
+ assert.deepEqual(attempts[1],attempts[0]);assert.equal((await t.store.read(t.id)).intent.id,intent);
+ assert.equal([...t.provider.data.keys()].filter(k=>k.startsWith('/checkout/sessions/')).length,1);
+});
+
+test('a response lost after execution reuses one session hours later without extending or changing its intent',async()=>{
+ const t=setup();let now=t.now,first=true;
+ const stripe=async(path,options)=>{const result=await t.provider.stripe(path,options);if(path==='/checkout/sessions'&&first){first=false;throw Error('response lost');}return result;};
+ const service=billingService({config:t.config,store:t.store,stripe,now:()=>now});
+ await assert.rejects(service.checkout(t.id,'starlit'));const before=(await t.store.read(t.id)).intent;
+ now+=6*3600;await service.checkout(t.id,'reactor');
+ assert.deepEqual((await t.store.read(t.id)).intent,before);
+ const attempts=t.provider.calls.filter(c=>c.path==='/checkout/sessions');assert.deepEqual(attempts[1],attempts[0]);
+ assert.equal([...t.provider.data.keys()].filter(k=>k.startsWith('/checkout/sessions/')).length,1);
+});
+
+test('an uncertain current-version intent stops before idempotency retention instead of rotating the key',async()=>{
+ const t=setup(),intent={id:'uncertain',created:t.now-23*3600,origin:t.config.origin,priceId:t.config.priceId,requestVersion:2};
+ await t.store.mutate(t.id,state=>{state.intent=intent;},{create:true});
+ await assert.rejects(t.service.checkout(t.id),{code:'UNCERTAIN_CHECKOUT'});
+ assert.deepEqual((await t.store.read(t.id)).intent,intent);
+ assert.equal(t.provider.calls.some(c=>c.options.method==='POST'),false);
+});
+
+test('legacy unknown intents retain the old provider parameters during their safe retry window',async()=>{
+ const t=setup(),created=t.now-600;
+ await t.store.mutate(t.id,state=>{state.intent={id:'legacy',created,origin:t.config.origin,priceId:t.config.priceId};},{create:true});
+ await t.service.checkout(t.id);const attempt=t.provider.calls.find(c=>c.path==='/checkout/sessions');
+ assert.equal(attempt.options.values.expires_at,created+3600);
+ assert.equal(attempt.options.values['payment_method_types[0]'],'card');
+ assert.equal(attempt.options.idempotencyKey,`cd-test-checkout-${t.id}-legacy`);
+ assert.equal((await t.store.read(t.id)).intent.requestVersion,undefined);
+});
+
+test('legacy unknown intents outside the valid expiry window need review without a replacement checkout',async()=>{
+ const t=setup(),intent={id:'legacy-uncertain',created:t.now-1800,origin:t.config.origin,priceId:t.config.priceId};
+ await t.store.mutate(t.id,state=>{state.intent=intent;},{create:true});
+ await assert.rejects(t.service.checkout(t.id),{code:'UNCERTAIN_CHECKOUT'});
+ assert.deepEqual((await t.store.read(t.id)).intent,intent);
+ assert.equal(t.provider.calls.some(c=>c.options.method==='POST'),false);
+});
+
+test('a known legacy session remains reusable after the creation window because it can be verified directly',async()=>{
+ const t=setup();let now=t.now;
+ await t.store.mutate(t.id,state=>{state.intent={id:'legacy',created:now,origin:t.config.origin,priceId:t.config.priceId};},{create:true});
+ const service=billingService({config:t.config,store:t.store,stripe:t.provider.stripe,now:()=>now});
+ await service.checkout(t.id);now+=1801;assert.equal((await service.checkout(t.id)).reused,true);
+ assert.equal(t.provider.calls.filter(c=>c.path==='/checkout/sessions').length,1);
+});
+
+test('customer creation cannot carry a legacy retry past its checkout creation deadline',async()=>{
+ const t=setup();let now=t.now;
+ await t.store.mutate(t.id,state=>{state.intent={id:'legacy',created:now-1700,origin:t.config.origin,priceId:t.config.priceId};},{create:true});
+ const stripe=async(path,options)=>{const result=await t.provider.stripe(path,options);if(path==='/customers')now+=101;return result;};
+ const service=billingService({config:t.config,store:t.store,stripe,now:()=>now});
+ await assert.rejects(service.checkout(t.id),{code:'UNCERTAIN_CHECKOUT'});
+ assert.equal(t.provider.calls.some(c=>c.path==='/checkout/sessions'),false);
+});
+
+test('unknown request versions and untrustworthy intent timestamps cannot bypass bounded retry',async()=>{
+ for(const patch of [{requestVersion:3},{created:undefined},{created:'1700000000'},{created:1700000001}]){
+  const t=setup(),intent={id:'uncertain',created:t.now,origin:t.config.origin,priceId:t.config.priceId,requestVersion:2,...patch};
+  await t.store.mutate(t.id,state=>{state.intent=intent;},{create:true});
+  await assert.rejects(t.service.checkout(t.id),{code:patch.requestVersion?'CHECKOUT_CONFIGURATION_CHANGED':'UNCERTAIN_CHECKOUT'});
+  assert.equal(t.provider.calls.some(c=>c.options.method==='POST'),false);
+ }
 });

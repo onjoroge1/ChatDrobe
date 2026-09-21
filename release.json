@@ -1,0 +1,7 @@
+{
+  "extension": {
+    "version": "0.8.0",
+    "source": "browser-extension/extension",
+    "channel": "private-beta"
+  }
+}

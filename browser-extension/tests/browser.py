@@ -174,15 +174,15 @@ with sync_playwright() as p:
     if(m.kind==='open-upgrade'){window.openedWorld=m.world;return {ok:true};}
     if(m.kind==='billing-refresh'){fixturePremium=true;return {ok:true,billing:{testSubscription:true}};}
     if(m.kind==='mutate'){fakeState=MoodDockCore.reduce(fakeState,m.action);handlers.forEach(fn=>fn({mooddock:{newValue:fakeState}},'local'));}
-    if(m.kind==='diagnostics')return {ok:true,stats:{applyCount:1,writeCount:2,extraDOMNodes:1},idle:{loaded:false}};
+    if(m.kind==='diagnostics')return {ok:true,experience:{...ChatDrobePrefs.experience(fakeState.prefs),revision:0,state:'displayed',visible:true},stats:{applyCount:1,writeCount:2,extraDOMNodes:1},idle:{loaded:false}};
     if(m.kind==='idle-preview')return {ok:true};return {ok:true,state:structuredClone(fakeState),access:{premium:fixturePremium,testSubscription:fixturePremium,testerPreview:false,paid:false}};
     }},storage:{onChanged:{addListener:fn=>handlers.push(fn)}}};""")
     script(panel,'panel-style.js');script(panel,'workspace.js')
     expect(panel.get_by_role('button',name='Free · 11',exact=True)).to_be_visible()
-    assert panel.locator('.world').count()==11
-    panel.get_by_role('button',name='Premium · 4',exact=True).click()
-    assert panel.locator('.world').count()==4
-    panel.get_by_role('button',name='Upgrade for Starlit Cat').click()
+    assert panel.locator('.world').count()==19
+    panel.get_by_role('button',name='Premium',exact=True).click()
+    assert panel.locator('.world').count()==8
+    panel.get_by_role('button',name='Connect for Starlit Cat').click()
     assert panel.evaluate('openedWorld')=='starlit'
     assert panel.evaluate('fakeState.prefs.theme')=='mooncat'
     panel.screenshot(path=str(OUT/'premium-locked.png'))
@@ -192,16 +192,29 @@ with sync_playwright() as p:
     panel.get_by_role('button',name='Account',exact=True).click()
     panel.get_by_role('button',name='Refresh Premium access',exact=True).click()
     panel.get_by_role('button',name='Worlds',exact=True).click()
-    panel.get_by_role('button',name='Apply Starlit Cat').click()
-    expect(panel.get_by_role('button',name='Apply Starlit Cat')).to_have_attribute('aria-pressed','true')
-    passed('Simulated verified subscription unlocks the four premium cards; no tester control exists')
+    panel.get_by_role('button',name='Select Starlit Cat').click()
+    expect(panel.get_by_role('button',name='Select Starlit Cat')).to_have_attribute('aria-pressed','true')
+    passed('Simulated verified subscription unlocks Premium themes, scenes and companion; no tester control exists')
+    panel.get_by_role('button',name='Subtle',exact=True).click()
+    panel.get_by_role('button',name='Select Starship Journey',exact=True).click()
+    panel.wait_for_timeout(100)
+    assert panel.evaluate('fakeState.prefs.livingEnabled && fakeState.prefs.livingMotion')
+    assert panel.evaluate('fakeState.prefs.livingBehavior')=='subtle'
+    expect(panel.locator('[data-page-status]')).to_contain_text('Displayed on the active ChatGPT tab')
+    panel.get_by_role('button',name='All worlds',exact=True).click()
+    panel.get_by_role('button',name='Select Mooncat Café',exact=True).click()
+    panel.wait_for_timeout(100)
+    assert not panel.evaluate('fakeState.prefs.livingEnabled')
+    assert panel.evaluate('fakeState.prefs.idleMode')=='off'
+    passed('Single gallery carries chosen motion into Living Worlds and atomically clears its engine when selecting a theme')
     panel.get_by_role('button',name='Read',exact=True).click()
     panel.get_by_label('Workspace appearance',exact=True).select_option('dark')
     panel.get_by_label('Panel appearance',exact=True).select_option('dark')
     expect(panel.locator('#mooddock-root')).to_have_attribute('data-panel-mode','dark')
     assert panel.evaluate('fakeState.prefs.mode')=='dark'
     passed('Read controls save workspace mode and independent panel dark mode')
-    panel.get_by_role('button',name='Play',exact=True).click()
+    panel.get_by_role('button',name='Worlds',exact=True).click()
+    panel.get_by_role('button',name='Advanced effects',exact=True).click()
     panel.get_by_label('Idle effect',exact=True).select_option('bites')
     expect(panel.get_by_label('Idle effect',exact=True)).to_have_value('off')
     panel.get_by_role('checkbox',name='Allow Word Bites on visible assistant text').check()
@@ -212,7 +225,7 @@ with sync_playwright() as p:
     panel.screenshot(path=str(OUT/'play-panel-dark.png'),full_page=True)
     panel.get_by_role('button',name='Worlds',exact=True).click()
     panel.screenshot(path=str(OUT/'premium-panel-dark.png'),full_page=True)
-    passed('Word Bites permission cannot be skipped in the Play panel')
+    passed('Word Bites permission cannot be skipped in Advanced effects')
     panel.get_by_role('button',name='Read',exact=True).click()
     panel.get_by_label('Panel appearance',exact=True).select_option('light')
     panel.get_by_role('button',name='Free · 11',exact=True) if False else None

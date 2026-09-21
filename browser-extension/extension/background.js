@@ -7,15 +7,25 @@ let queue=Promise.resolve(),ready=null;
 const billing=ChatDrobeCommerceConfig.channel==='sandbox'?ChatDrobeBilling.create({storage:chrome.storage.local,alarms:chrome.alarms,config:ChatDrobeCommerceConfig,extensionId:chrome.runtime.id}):null;
 const PENDING='chatdrobe:pending-upgrade-v1';
 async function currentAccess(raw){return billing?billing.status():ChatDrobeAccess.access(raw||{},ChatDrobeCommerceConfig);}
-function safeTarget(value={}){
- const result={enabled:true};
- if(MoodDockCore.THEMES.some(t=>t.id===value.theme))result.theme=value.theme;
- if(value.livingEnabled===true&&['tokyo','starship','train'].includes(value.livingWorld)){result.livingEnabled=true;result.livingWorld=value.livingWorld;result.livingWeather=value.livingWorld==='tokyo'?'rain':'clear';result.livingMotion=false;result.livingReactions=false;}
+// Persist the exact bounded visual request, without account data or text-inspection permission.
+function safeTarget(value={},current={}){
+ if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('Choose a supported experience.');
+ const canonical=Object.hasOwn(value,'kind');
+ const legacy={...current,...value};
+ if(!canonical&&Object.hasOwn(value,'theme')&&value.livingEnabled!==true&&value.idleMode!=='natural'){legacy.livingEnabled=false;legacy.idleMode='off';}
+ const selection=canonical?value:MoodDockCore.experience(legacy);
+ const selected=MoodDockCore.selectExperience(current,selection);
+ const fields=['enabled','theme','motion','idleMode','companion','livingEnabled','livingWorld','livingMotion','livingBehavior','livingReactions','decoration','accent','livingWeather'];
+ const result=Object.fromEntries(fields.map(key=>[key,selected[key]]));
+ const engineFields=['theme','motion','idleMode','companion','livingEnabled','livingWorld','livingMotion','livingBehavior'];
+ const optional=Object.keys(MoodDockCore.DEFAULTS).filter(key=>key!=='wordBitesConsent'&&(!canonical||!engineFields.includes(key)));
+ const normalized=MoodDockCore.prefs({...selected,...Object.fromEntries(optional.filter(key=>Object.hasOwn(value,key)).map(key=>[key,value[key]])),wordBitesConsent:false});
+ for(const key of optional)if(Object.hasOwn(value,key))result[key]=normalized[key];
  return result;
 }
 async function updateBillingSnapshot(){
  const run=queue.catch(()=>{}).then(async()=>{await initialize();const saved=await chrome.storage.local.get(['mooddock',ACCESS_KEY,PENDING]);let state=MoodDockCore.state(saved.mooddock);const access=await currentAccess(saved[ACCESS_KEY]);
- if(access.premium&&saved[PENDING]){state=MoodDockCore.reduce(state,{type:'settings',value:safeTarget(saved[PENDING])});await chrome.storage.local.set({mooddock:state,[PENDING]:null});}
+ if(access.premium&&saved[PENDING]){state=MoodDockCore.reduce(state,{type:'settings',value:safeTarget(saved[PENDING],state.prefs)});await chrome.storage.local.set({mooddock:state,[PENDING]:null});}
  await snapshotFor(state,access);return access;});queue=run;return run;
 }
 
@@ -104,14 +114,14 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
    if(k==='commerce-status'){respond({ok:true,access,checkout:ChatDrobeAccess.checkout()});return;}
    if(k==='start-checkout'){if(!billing)throw new Error(ChatDrobeAccess.checkout().reason);await chrome.tabs.create({url:chrome.runtime.getURL('account.html')});respond({ok:true});return;}
    if(k==='open-upgrade'){
-    const target=safeTarget(message.target||{theme:message.world});
+    const target=safeTarget(message.target||{theme:message.world},state.prefs);
     if(billing){
      access=await billing.ensure();
      if(access.premium){
       state=MoodDockCore.reduce(state,{type:'settings',value:target});
       await chrome.storage.local.set({mooddock:state,[PENDING]:null});
       const snapshot=await snapshotFor(state,access);
-      respond({ok:true,applied:true,access,state:{...state,prefs:snapshot.prefs}});return;
+      respond({ok:true,applied:true,access,state:{...state,prefs:snapshot.prefs},desiredPrefs:state.prefs,revision:snapshot.revision});return;
      }
      await chrome.storage.local.set({[PENDING]:target});
      // One connection screen, not an upgrade page followed by another connection page.
@@ -125,7 +135,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if(ChatDrobeCommerceConfig.channel!=='private-beta'||!ChatDrobeCommerceConfig.allowTesterPreview)throw new Error('Test preview is unavailable in this build.');
     if(typeof message.enabled!=='boolean')throw new Error('Invalid preview setting.');
     rawAccess={testerPreview:message.enabled};await chrome.storage.local.set({[ACCESS_KEY]:rawAccess});access=await currentAccess(rawAccess);
-    await snapshotFor(state,access);respond({ok:true,state:{...state,prefs:ChatDrobeAccess.effective(state.prefs,access)},access});return;
+    const snapshot=await snapshotFor(state,access);respond({ok:true,state:{...state,prefs:snapshot.prefs},desiredPrefs:state.prefs,revision:snapshot.revision,access});return;
    }
    if(k==='diagnostics'||k==='idle-preview'){
     if(k==='idle-preview'&&!access.premium)throw new Error('Connect your account and verify Premium access before previewing a companion.');
@@ -135,15 +145,20 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
    }
    if(k==='mutate'){
     const candidate=MoodDockCore.reduce(state,message.action);
-    if(billing&&message.action?.type==='settings'&&ChatDrobeAccess.requiresPremium(message.action.value||{}))access=await billing.ensure();
-    if(message.action?.type==='settings'&&!access.premium&&ChatDrobeAccess.requiresPremium(message.action.value||{}))throw new Error('Premium selection requires an upgrade. Your current free appearance was not changed.');
+    const appearanceChange=['settings','select-experience'].includes(message.action?.type);
+    const premiumRequest=appearanceChange&&ChatDrobeAccess.requiresPremium(message.action.type==='select-experience'?candidate.prefs:message.action.value||{});
+    if(billing&&premiumRequest)access=await billing.ensure();
+    if(premiumRequest&&!access.premium)throw new Error('Premium selection requires an upgrade. Your current free appearance was not changed.');
     if(message.action?.type==='timer')await changeFocus(candidate.timerUntil);
+    if(message.action?.type==='restore-backup'){await changeFocus(0);await chrome.storage.local.set({[PENDING]:null});}
     state=candidate;
+    // A newer explicit choice supersedes an older request awaiting account access.
+    if(['select-experience','settings','reset'].includes(message.action?.type))await chrome.storage.local.set({[PENDING]:null});
     if(message.action?.type==='wipe'){if(billing){await billing.disconnect();await chrome.storage.local.set({[PENDING]:null});}await chrome.storage.local.set({[FOCUS_KEY]:ChatDrobeFocus.normalize()});await chrome.alarms?.clear(FOCUS_ALARM);rawAccess={};access=await currentAccess(rawAccess);await chrome.storage.local.set({[ACCESS_KEY]:rawAccess});}
     await chrome.storage.local.set({mooddock:state});
    }else if(!['read','read-prefs'].includes(k))throw new Error('Unknown request.');
    const snapshot=await snapshotFor(state,access);
-   if(k==='read-prefs')respond({ok:true,snapshot});else respond({ok:true,state:{...state,prefs:snapshot.prefs},access});
+   if(k==='read-prefs')respond({ok:true,snapshot});else respond({ok:true,state:{...state,prefs:snapshot.prefs},desiredPrefs:state.prefs,revision:snapshot.revision,access});
   }catch(error){respond({ok:false,error:error.message||'Local storage operation failed.'});}
  });return true;
 });

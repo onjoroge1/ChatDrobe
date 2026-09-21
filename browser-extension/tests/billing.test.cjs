@@ -9,7 +9,9 @@ function fixture(){
  function token(device,changes={}){const header={alg:'ES256',typ:'JWT',kid:'fixture'},claims={iss:'chatdrobe-billing-test',aud:'chatdrobe-extension',sub:hash('member'),did:hash(device),environment:'test',plan,iat:Math.floor(now/1000),exp:Math.floor(now/1000)+600,...changes};const body=[header,claims].map(v=>Buffer.from(JSON.stringify(v)).toString('base64url')).join('.');return body+'.'+sign('sha256',Buffer.from(body),{key:privateKey,dsaEncoding:'ieee-p1363'}).toString('base64url');}
  const fetcher=async(url,options)=>{
   const action=new URL(url).searchParams.get('action'),credential=options.headers.Authorization.slice(7);requests.push({action,body:options.body,url,credential});
-  if(fail==='network')throw Error('Network unavailable');if(fail==='signer'&&action==='entitlement')return new Response(JSON.stringify({error:{code:'ACCESS_SIGNING_NOT_READY',message:'BILLING_SIGNING_PRIVATE_KEY is missing. Your account connection is saved.'}}),{status:503});if(fail===401)return new Response(JSON.stringify({error:{code:'DEVICE_SIGN_IN_REQUIRED',message:'Reconnect'}}),{status:401});
+  if(fail==='network')throw Error('Network unavailable');if(fail==='signer'&&action==='entitlement')return new Response(JSON.stringify({error:{code:'ACCESS_SIGNING_NOT_READY',message:'BILLING_SIGNING_PRIVATE_KEY is missing. Your account connection is saved.'}}),{status:503});
+  if(Number.isInteger(fail))return new Response(JSON.stringify({error:{code:fail===429?'RATE_LIMIT':'DEVICE_SIGN_IN_REQUIRED',message:fail===429?'Try again later':'Reconnect'}}),{status:fail});
+  if(fail?.status)return new Response(fail.body,{status:fail.status});
   let result=action==='start'?{code:'ABCDE-12345-ABCDE-12345',expiresAt:now/1000+600,verificationUrl:'https://www.chatdrobe.com/account/#link=ABCDE-12345-ABCDE-12345'}:action==='poll'?{linked,account:{email:'member@example.test'}}:action==='entitlement'?{linked:true,account:{email:'member@example.test'},token:token(wrong?'other-device':credential),plan,billingEnabled:true}: {ok:true};
   if(intercept&&action==='entitlement')await intercept;
   return new Response(JSON.stringify(result),{status:200});
@@ -37,3 +39,22 @@ test('only a signed admin source is complimentary; arbitrary source and local ro
 test('approval link is available after restart, carries the SAME code, and expires without regenerating credentials',async()=>{const f=fixture();await f.client.start();const credential=f.storageData[f.client.KEY].secret;const r=await f.restart().status();assert.equal(r.verificationUrl,'https://www.chatdrobe.com/account/#link=ABCDE-12345-ABCDE-12345');assert.equal(f.storageData[f.client.KEY].secret,credential);f.advance(601000);assert.equal((await f.client.status()).verificationUrl,'');});
 test('signing failure keeps the approved account and reports configuration rather than asking for a new purchase',async()=>{const f=fixture();await f.client.start();f.setLinked(true);f.setFail('signer');const r=await f.client.refresh();assert.equal(r.connected,true);assert.equal(r.premium,false);assert.equal(r.lastErrorCode,'ACCESS_SIGNING_NOT_READY');assert.equal(r.linkCode,'');assert.ok(f.storageData[f.client.KEY].secret);f.setFail(null);f.setPlan('plus');assert.equal((await f.client.refresh()).premium,true);assert.equal((await f.client.status()).lastErrorCode,'');});
 test('network failures have an actionable error code and never discard an already connected identity',async()=>{const f=await connected('free');f.setFail('network');const r=await f.client.refresh();assert.equal(r.connected,true);assert.equal(r.lastErrorCode,'NETWORK_UNAVAILABLE');assert.match(r.lastError,/connection is saved/);});
+
+test('temporary HTTP failures retain only the existing signed proof and its original expiry',async()=>{
+ for(const fail of [408,425,429,500,503,{status:429,body:'<html>Too many requests</html>'}]){
+  const f=await connected(),proof=f.storageData[f.client.KEY].token,expiry=f.alarmsData.get(f.client.EXPIRY).when;
+  f.advance(300000);f.setFail(fail);const refreshed=await f.client.refresh();
+  assert.equal(refreshed.premium,true);assert.equal(refreshed.connected,true);
+  assert.equal(f.storageData[f.client.KEY].token,proof);assert.equal(f.alarmsData.get(f.client.EXPIRY).when,expiry);
+  f.advance(300000);assert.equal((await f.client.refresh()).premium,false);
+  assert.equal(f.alarmsData.has(f.client.EXPIRY),false);
+ }
+});
+test('permanent HTTP denials revoke credentials even when the response body is not JSON',async()=>{
+ for(const fail of [401,403,{status:401,body:'Unauthorized'},{status:403,body:'x'.repeat(17000)}]){
+  const f=await connected();f.setFail(fail);const refreshed=await f.client.refresh();
+  assert.equal(refreshed.connected,false);assert.equal(refreshed.premium,false);
+  assert.equal(f.storageData[f.client.KEY].token,undefined);assert.equal(f.storageData[f.client.KEY].secret,undefined);
+  assert.equal(f.alarmsData.size,0);
+ }
+});
