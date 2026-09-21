@@ -1,7 +1,7 @@
 ChatDrobe 0.8.0 — private sandbox review build
 
 UPDATE AN EXISTING INSTALLATION
-Export a full backup from Tools. Keep the folder already loaded in Chrome. Extract the review ZIP and replace runtime files in that SAME folder, reload its existing card at chrome://extensions, then refresh ChatGPT. Confirm About reports 0.8.0. Do not uninstall or clear storage to update. The ZIP has manifest.json at its root.
+Export a full backup from About. Keep the folder already loaded in Chrome. Extract the review ZIP and replace runtime files in that SAME folder, reload its existing card at chrome://extensions, then refresh ChatGPT. Confirm About reports 0.8.0. Do not uninstall or clear storage to update. The ZIP has manifest.json at its root.
 
 FIRST INSTALLATION
 Extract the ZIP to a permanent folder. Open chrome://extensions, enable Developer mode, choose Load unpacked, and select the folder containing manifest.json. Open ChatGPT and the ChatDrobe side panel from Chrome's extension action.
