@@ -1,0 +1,24 @@
+Tokyo planted reading nook — curated artwork
+
+Two potted plant props derive from Sprouts by DiceBear.
+Source: https://www.dicebear.com/styles/sprouts/
+Source package: @dicebear/styles 10.6.0
+Source repository: https://github.com/dicebear/styles
+Artwork dedication: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+Legal text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+The source definition includes this notice:
+“Sprouts” (https://www.dicebear.com) by “DiceBear”, licensed under
+“CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/).
+
+ChatDrobe selected plant and pot components, removed avatar faces/backgrounds and
+upstream animation, recolored the props, namespaced SVG references, and composed
+them in the existing Tokyo scene. DiceBear does not endorse ChatDrobe.
+
+This dedication applies to the selected Sprouts artwork only. The original
+ChatDrobe cat rig, world layout, code and the Lottie pilot retain their respective
+ownership/licenses. No DiceBear runtime or remote avatar request is included.
+
+Machine-readable source, version, component selections and checksums are recorded
+in art-sources.json. Reproduction: tools/artwork/README.md in the source repository.

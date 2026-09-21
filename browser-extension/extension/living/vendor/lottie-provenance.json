@@ -1,0 +1,16 @@
+{
+  "package": "lottie-web",
+  "version": "5.13.0",
+  "repository": "https://github.com/airbnb/lottie-web",
+  "tarball": "https://registry.npmjs.org/lottie-web/-/lottie-web-5.13.0.tgz",
+  "npmIntegrity": "sha512-+gfBXl6sxXMPe8tKQm7qzLnUy5DUPJPKIyRHwtpCpyUEYjHYRJC/5gjUvdkuO2c3JllrPtHXH5UJJK8LRYl5yQ==",
+  "sourcePath": "build/player/lottie_light.js",
+  "sourceSha256": "96b0710aa725b09ecab886afad23deb073b65436eabcfde225e0b3781567222b",
+  "outputPath": "lottie-light-5.13.0.mjs",
+  "outputSha256": "f4063511014fabde7e5c6178ae83b12eb44236593e15c15808f0467defb7b365",
+  "license": "MIT",
+  "licenseFile": "lottie-LICENSE.txt",
+  "licenseSha256": "9d8d4d8b4bb99572ee8b51025a30b8493d949798cac465c6c15b1b29420bcb06",
+  "adaptations": ["Replace UMD wrapper with private ESM default export", "Disable standalone mode", "Remove document discovery polling and legacy bodymovin global"],
+  "regenerateWith": "node browser-extension/scripts/vendor-lottie.mjs /path/to/extracted/package"
+}

@@ -32,7 +32,9 @@ try:
             page.goto(BASE,wait_until='networkidle')
             preview=page.locator('[data-living-preview]');room=preview.locator('[data-env-live]').locator('.room')
             expect(preview).to_have_attribute('data-motion','false')
-            assert not any('/living-renderer.js' in r or '/living-model.js' in r or '/living-runtime.css' in r for r in requests)
+            expect(preview).to_have_attribute('data-ready','true')
+            expect(room).to_have_attribute('data-world','tokyo')
+            assert not any('/lottie-light-' in r for r in requests), 'Initial Still preview must not load the animation player'
             page.get_by_role('button',name='Starship Journey',exact=True).click()
             expect(preview).to_have_attribute('data-ready','true')
             expect(room).to_have_attribute('data-world','starship')
@@ -106,7 +108,7 @@ try:
             expect(bad.locator('[data-env-room="tokyo"]').first).to_be_visible();failure.close()
             assert not errors,errors
             assert all(url.startswith(BASE) for url in requests),'Unexpected third-party request'
-            (OUT/'living-checks.json').write_text(json.dumps({'passed':['lazy renderer loading and existing CSP','accelerated chapters, pause and scrub','weather, idle, return, streaming and Quiet Focus','Portal geometry and reduced motion','offscreen pause','five pages at four widths','catalog, pricing, keyboard and no-JavaScript','load failure keeps the static fallback']}))
+            (OUT/'living-checks.json').write_text(json.dumps({'passed':['visible Still renderer and lazy player loading under existing CSP','accelerated chapters, pause and scrub','weather, idle, return, streaming and Quiet Focus','Portal geometry and reduced motion','offscreen pause','five pages at four widths','catalog, pricing, keyboard and no-JavaScript','load failure keeps the static fallback']}))
             print('8 Living website HTTP browser groups passed.')
         finally:
             context.tracing.stop(path=str(OUT/'living-trace.zip'));browser.close()

@@ -18,8 +18,8 @@ function selectExperience(value,selection){
  const reactions=same&&p.livingReactions;
  Object.assign(p,{enabled:true,motion:false,idleMode:'off',livingEnabled:false,livingMotion:false,livingReactions:reactions});
  if(motion!=='still')p.livingBehavior=motion==='subtle'?'subtle':'progressive';
- if(kind==='theme')Object.assign(p,{theme:id,accent:same?p.accent:'',motion:motion!=='still',decoration:true});
- if(kind==='living')Object.assign(p,{theme:{tokyo:'mooncat',starship:'bridge',train:'paper'}[id],accent:'',livingEnabled:true,livingWorld:id,livingMotion:motion!=='still',livingWeather:same?p.livingWeather:id==='tokyo'?'rain':'clear'});
+ if(kind==='theme')Object.assign(p,{theme:id,accent:same?p.accent:'',motion:motion!=='still',decoration:same?p.decoration:true});
+ if(kind==='living')Object.assign(p,{theme:same?p.theme:{tokyo:'mooncat',starship:'bridge',train:'paper'}[id],accent:same?p.accent:'',livingEnabled:true,livingWorld:id,livingMotion:motion!=='still',livingWeather:same?p.livingWeather:id==='tokyo'?'rain':'clear'});
  if(kind==='companion')Object.assign(p,{idleMode:'natural',companion:'cat',livingMotion:motion!=='still'});
  return prefs(p);
 }

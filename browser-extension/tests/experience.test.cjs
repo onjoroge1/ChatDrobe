@@ -16,11 +16,33 @@ test('one world selection replaces every competing renderer and preserves local 
 
 test('motion changes preserve customization of the same world and Still stops its motion',()=>{
  let s=select({},'living','tokyo','subtle');
- s=C.reduce(s,{type:'settings',value:{livingWeather:'snow',livingTime:'night',livingView:'full',livingReactions:true,mode:'dark',width:1000}});
+ s=C.reduce(s,{type:'settings',value:{livingWeather:'snow',livingTime:'night',livingView:'full',livingReactions:true,mode:'dark',width:1000,accent:'#aabbcc',decoration:false,theme:'forest'}});
  s=select(s,'living','tokyo','playful');
- for(const [key,value] of Object.entries({livingWeather:'snow',livingTime:'night',livingView:'full',livingReactions:true,mode:'dark',width:1000}))assert.equal(s.prefs[key],value,key);
+ for(const [key,value] of Object.entries({livingWeather:'snow',livingTime:'night',livingView:'full',livingReactions:true,mode:'dark',width:1000,accent:'#aabbcc',decoration:false,theme:'forest'}))assert.equal(s.prefs[key],value,key);
  s=select(s,'living','tokyo','still');assert.equal(s.prefs.livingEnabled,true);assert.equal(s.prefs.livingMotion,false);
  s=select(s,'companion','cat','still');assert.equal(s.prefs.idleMode,'natural');assert.equal(s.prefs.livingMotion,false);
+});
+
+test('same-experience motion preserves appearance while an explicit selection resumes paused styling',()=>{
+ for(const [kind,id]of [['theme','mooncat'],['living','tokyo'],['companion','cat']]){
+  let s=select({},kind,id);
+  s=C.reduce(s,{type:'settings',value:{accent:'#123abc',decoration:false,enabled:false}});
+  for(const motion of ['subtle','playful','still']){
+   s=select(s,kind,id,motion);
+   assert.equal(s.prefs.accent,'#123abc',kind+' accent');
+   assert.equal(s.prefs.decoration,false,kind+' decoration');
+   assert.equal(s.prefs.enabled,true,kind+' explicit selection resumes styling');
+   assert.deepEqual(P.experience(s.prefs),{kind,id,motion});
+  }
+ }
+});
+test('changing worlds still restores the new world palette and theme decoration defaults',()=>{
+ let s=select({},'theme','mooncat');s=C.reduce(s,{type:'settings',value:{accent:'#123abc',decoration:false,enabled:false}});
+ s=select(s,'theme','ocean','subtle');
+ assert.equal(s.prefs.accent,'');assert.equal(s.prefs.decoration,true);assert.equal(s.prefs.enabled,true);
+ s=select(s,'living','tokyo');s=C.reduce(s,{type:'settings',value:{accent:'#123abc',theme:'forest',enabled:false}});
+ s=select(s,'living','starship','playful');
+ assert.equal(s.prefs.accent,'');assert.equal(s.prefs.theme,'bridge');assert.equal(s.prefs.enabled,true);
 });
 
 test('stored historic renderer conflicts resolve consistently without granting text inspection',()=>{

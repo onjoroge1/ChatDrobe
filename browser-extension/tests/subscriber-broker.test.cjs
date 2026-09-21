@@ -41,3 +41,16 @@ test('a later Free selection cancels queued Premium intent before account approv
 test('entitlement expiry changes the effective snapshot revision while keeping the complete desired choice',async()=>{const w=worker();w.permit();await w.send('billing-start');w.link();w.plus();await w.send('billing-refresh');await w.send('mutate',{action:{type:'select-experience',value:{kind:'living',id:'tokyo',motion:'subtle'}}});const before=await w.send('read');w.advance(601000);w.expire();const after=await w.send('read');assert.equal(after.access.premium,false);assert.equal(after.state.prefs.livingEnabled,false);assert.equal(after.desiredPrefs.livingEnabled,true);assert.equal(after.desiredPrefs.livingMotion,true);assert.ok(after.revision>before.revision);assert.equal(w.broadcasts.at(-1).snapshot.revision,after.revision);assert.equal(w.broadcasts.at(-1).snapshot.prefs.livingEnabled,false);});
 test('pending appearance import retains every bounded visual preference without content permission',async()=>{const w=worker();const target=Core.prefs({theme:'starlit',font:'serif',fontSize:21,lineHeight:1.9,width:700,focus:true,bubbles:false,mode:'dark',motion:true,decoration:false,accent:'#aabbcc',wordBitesConsent:true});await w.send('open-upgrade',{target});assert.equal(w.data['chatdrobe:pending-upgrade-v1'].wordBitesConsent,undefined);w.permit();await w.send('billing-start');w.link();w.plus();await w.send('billing-refresh');const r=await w.send('read');for(const [key,value]of Object.entries(target))if(key!=='wordBitesConsent')assert.equal(r.desiredPrefs[key],value,key);assert.equal(r.desiredPrefs.wordBitesConsent,false);});
 test('successful new appearance settings discard pending intent while note edits preserve it',async()=>{const w=worker();await w.send('open-upgrade',{target:{kind:'living',id:'train',motion:'playful'}});await w.send('mutate',{action:{type:'notes',value:'Keep pending'}});assert.ok(w.data['chatdrobe:pending-upgrade-v1']);await w.send('mutate',{action:{type:'settings',value:{font:'serif'}}});assert.equal(w.data['chatdrobe:pending-upgrade-v1'],null);});
+
+test('pending same-world motion preserves custom accent and decoration through verified account restoration',async()=>{
+ for(const [kind,id]of [['theme','mooncat'],['living','tokyo']]){
+  const w=worker();
+  w.data.mooddock=Core.reduce(Core.reduce(w.data.mooddock,{type:'select-experience',value:{kind,id,motion:'still'}}),{type:'settings',value:{accent:'#123abc',decoration:false,enabled:false}});
+  const requested=await w.send('open-upgrade',{target:{kind,id,motion:'subtle'}});assert.equal(requested.ok,true);
+  const pending=w.data['chatdrobe:pending-upgrade-v1'];assert.equal(pending.accent,'#123abc');assert.equal(pending.decoration,false);assert.equal(pending.enabled,true);
+  w.permit();await w.send('billing-start');w.link();w.plus();await w.send('billing-refresh');
+  const restored=await w.send('read');assert.deepEqual(Core.experience(restored.state.prefs),{kind,id,motion:'subtle'});
+  assert.equal(restored.state.prefs.accent,'#123abc');assert.equal(restored.state.prefs.decoration,false);assert.equal(restored.state.prefs.enabled,true);
+  assert.equal(w.data['chatdrobe:pending-upgrade-v1'],null);
+ }
+});
