@@ -37,6 +37,9 @@ jobs:
       - name: Packaged Lottie CSP, lifecycle and fixture performance
         if: ${{ !cancelled() && steps.browser_tools.outcome == 'success' }}
         run: python browser-extension/tests/lottie_browser.py
+      - name: Companion Studio finite clips, pose bounds and artwork review
+        if: ${{ !cancelled() && steps.browser_tools.outcome == 'success' }}
+        run: python browser-extension/tests/motion-studio-browser.py
       - uses: actions/upload-artifact@v5
         if: always()
         with:

@@ -1,12 +1,13 @@
 # ChatDrobe
 
-ChatDrobe's desktop Chrome extension, companion website and test billing/account server are versioned together. The private review build is **0.8.0**; `release.json` is the version authority. This repository does not represent a live-payment or Chrome Web Store release.
+ChatDrobe's desktop Chrome extension, companion website and test billing/account server are versioned together. The private review build is **0.9.1**; `release.json` is the version authority. This repository does not represent a live-payment or Chrome Web Store release.
 
 - `browser-extension/extension/` — the Manifest V3 runtime loaded by Chrome.
 - `browser-extension/tests/` — state, worker, renderer and offline browser fixtures.
 - `src/` — website pages and scripts; scene previews use the extension's local modules.
 - `server/`, `api/` — account linking, short-lived signed access and test billing.
 - `docs/PREMIUM-REPAIR-ACCEPTANCE.md` — audit repairs and remaining release checks.
+- `docs/CREATIVE-STATUS.md` — actual artwork integrations, older PR status and prioritized remaining work.
 
 ## Product behavior
 

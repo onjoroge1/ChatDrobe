@@ -1,6 +1,6 @@
 # ChatDrobe extension
 
-The versioned Manifest V3 runtime is in `extension/`. This source was imported from the audited 0.7.0 source archive; 0.8.0 repaired selection, saved appearance, account handoff and access refresh. 0.9.0 adds immediate motion selection, automatic display checks, a measured empty-space fallback, curated Tokyo artwork and a bundled Lottie light pilot. See `../docs/WORLDS-ART-MOTION.md` for verification and remaining launch gates. `../release.json` is the release version authority. The package and Chrome manifest must match it or the build fails.
+The versioned Manifest V3 runtime is in `extension/`. This source was imported from the audited 0.7.0 source archive; 0.8.0 repaired selection, saved appearance, account handoff and access refresh. 0.9.0 adds immediate motion selection, automatic display checks, a measured empty-space fallback, curated Tokyo artwork and a bundled Lottie light pilot. 0.9.1 refines the shared cat artwork and restores the developer pose-review workflow. See `../docs/CREATIVE-STATUS.md` for the integration inventory and remaining work, and `../docs/WORLDS-ART-MOTION.md` for verification and remaining launch gates. `../release.json` is the release version authority. The package and Chrome manifest must match it or the build fails.
 
 Run from the repository root with Node 22 and Python 3:
 

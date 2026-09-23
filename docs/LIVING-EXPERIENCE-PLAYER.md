@@ -1,5 +1,7 @@
 # Living Worlds experience player
 
+> Historical implementation record for the v0.5.1 website player. Its snapshot paths, interaction-only loading and bundle budgets below are no longer the current architecture. The versioned extension now supplies the shared renderer; visible previews load it in Still mode, and Tokyo has a bounded, lazy Lottie pilot. See [current worlds implementation](WORLDS-ART-MOTION.md), [pilot measurements and limits](LOTTIE-PILOT.md), and [current creative status](CREATIVE-STATUS.md). The future product tests at the end remain proposals.
+
 ## What changed
 
 The homepage, /living-worlds/ and /premium/ now offer an explicit **Watch a 30-second journey** action, chapter scrubbing, supported weather and lighting, Portal/full composition, and simulated session moments. A cat rests/wakes, the lamp responds, the spacecraft lights signal and Quiet Focus pauses motion. The timeline runs once, can pause/resume/reset, and does not advance while the preview is offscreen or the document is hidden/unfocused. Reduced motion disables playback while preserving manual chapter/atmosphere controls.
