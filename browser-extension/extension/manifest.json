@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatDrobe \u2014 Themes & Workspace (Sandbox Test)",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Original themes, reading controls and a local workspace for use with ChatGPT. Independent; not affiliated with OpenAI.",
   "minimum_chrome_version": "120",
   "permissions": [
