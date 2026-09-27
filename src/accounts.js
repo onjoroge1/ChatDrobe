@@ -1,4 +1,4 @@
-import {linkFragment} from './connection-flow.js';
+import {authDestination,linkFragment} from './connection-flow.js';
 /* Same-origin cookie-authenticated UI. Credentials never enter localStorage or URLs. */
 const page=document.querySelector('[data-account-page]');
 if(page){
@@ -11,11 +11,10 @@ if(page){
  const date=value=>{if(!value)return '—';const d=new Date(value);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString();};
  const busy=async(fn)=>{if(loading)return;loading=true;page.setAttribute('aria-busy','true');try{await fn();}catch(e){note(e.message,true);}finally{loading=false;page.removeAttribute('aria-busy');}};
  function signedOut(){profile=null;$('[data-account-content]')?.setAttribute('hidden','');$('[data-admin-content]')?.setAttribute('hidden','');$('[data-admin-users]')?.replaceChildren();text($('[data-account-email]'),'');$('[data-account-signedout]')?.removeAttribute('hidden');}
- const destination=()=>['admin','account'].includes(new URLSearchParams(location.search).get('next'))?'/'+new URLSearchParams(location.search).get('next')+'/':'/account/';
  if(mode==='signup'||mode==='signin'){
-  const emailForm=$('[data-auth-email]'),codeForm=$('[data-auth-code]');busy(async()=>{const status=await call('status');if(!status.signInAvailable){note('Email sign-in is not connected yet. No code will be sent until setup is complete.');return;}emailForm.hidden=false;note('Enter your email to receive a one-time code.');});
+  const emailForm=$('[data-auth-email]'),codeForm=$('[data-auth-code]');busy(async()=>{const status=await call('status');if(!status.signInAvailable){note('Email sign-in is not connected yet. No code will be sent until setup is complete.');return;}emailForm.hidden=false;note(linkFragment(location.hash)?'Sign in to approve your attached extension code. Your selected world stays saved in the extension.':'Enter your email to receive a one-time code.');});
   emailForm.addEventListener('submit',event=>{event.preventDefault();busy(async()=>{const input={email:emailForm.elements.email.value,mode};if(mode==='signup')input.acceptBeta=emailForm.elements.acceptBeta.checked;note('Sending your verification code…');const reply=await call('request-code',input);emailForm.hidden=true;codeForm.hidden=false;note(reply.message);codeForm.elements.code.focus();});});
-  codeForm.addEventListener('submit',event=>{event.preventDefault();busy(async()=>{note('Verifying your code…');await call('verify-code',{code:codeForm.elements.code.value.trim()});codeForm.reset();location.assign(destination()+linkFragment(location.hash));});});
+  codeForm.addEventListener('submit',event=>{event.preventDefault();busy(async()=>{note('Verifying your code…');await call('verify-code',{code:codeForm.elements.code.value.trim()});codeForm.reset();location.assign(authDestination(location.search,location.hash));});});
   $('[data-auth-again]').addEventListener('click',()=>{codeForm.reset();codeForm.hidden=true;emailForm.hidden=false;note('Enter your email and request a fresh code.');emailForm.elements.email.focus();});
  }else{
   async function refreshProfile(){try{profile=await call('me');$('[data-account-signedout]').hidden=true;}catch(e){if(e.status===401||e.status===403){signedOut();note(e.message,true);return false;}throw e;}return true;}

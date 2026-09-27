@@ -1,5 +1,5 @@
 import {extensionVersion} from './product-release.mjs';
-import {staticCatArt,staticWorldProps} from './living-static-art.mjs';
+import {staticCatArt,staticWorldProps,staticInteriorArt} from './living-static-art.mjs';
 /* Static illustrations remain available without JavaScript. Visible previews load
  * the canonical extension renderer in Still mode; movement remains opt-in. */
 import {WORLDS} from '../browser-extension/extension/living/model.mjs';
@@ -16,18 +16,17 @@ export function livingArt(id,instance){
  if(!livingIds.includes(id)||!/^[-a-z0-9]+$/.test(instance))throw new Error('Unknown scene or invalid preview instance.');
  const sky=`env-sky-${instance}`,clip=`env-view-${instance}`;
  const city=times(10).map(i=>{const x=i*105,h=90+(i*43)%140;return rect(x,405-h,85,h,'var(--env-city)')+times(6).map(j=>rect(x+12+(j%3)*23,420-h+Math.floor(j/3)*30,11,15,'var(--env-window)')).join('');}).join('');
- const cat=staticCatArt(instance),props=staticWorldProps(id,instance);
- const lamp=`<g><ellipse cx="171" cy="540" rx="83" ry="18" fill="#ffe0a0" opacity=".4"/><path d="M173 536V432l54-43" fill="none" stroke="#987551" stroke-width="9"/><path d="M202 369q44-29 75 16l-69 26Z" fill="#d5b07c"/><ellipse cx="171" cy="538" rx="38" ry="8" fill="#ba9267"/></g>`;
+ const cat=staticCatArt(instance),props=staticWorldProps(id,instance),interior=staticInteriorArt(id,instance);
  let outside='',inside='';
  if(id==='tokyo'){
   outside=city+`<path d="M410 405l30-191l30 191m-49-65h39" fill="none" stroke="#b37988" stroke-width="6"/><g>${rect(90,410,87,21,'#dfab80','rx="7"')}${rect(110,399,45,19,'#485d71','rx="5"')}<circle cx="110" cy="435" r="7" fill="#293c50"/><circle cx="156" cy="435" r="7" fill="#293c50"/></g><g stroke="#eef8ff" stroke-width="2" opacity=".65">${times(26).map(i=>`<path d="M${40+i*37} ${20+i*61%360}l-13 47"/>`).join('')}</g>`;
-  inside=rect(0,518,1000,142,'var(--env-wood)')+rect(384,543,224,49,'#eee0c9','rx="8"')+lamp+(id==='tokyo'?props:'')+cat;
+  inside=interior+props+cat;
  }else if(id==='starship'){
   outside=`<g fill="#f5ebd1">${times(32).map(i=>`<circle cx="${42+(i*193)%900}" cy="${48+(i*79)%355}" r="${i%5===0?2:1}"/>`).join('')}</g><g><circle cx="764" cy="206" r="112" fill="#8cbccd" opacity=".2"/><circle cx="764" cy="206" r="103" fill="#77a5bd"/>${props}</g><path d="M122 153l63-14l34 19l-57 7Z" fill="#eff5fa"/>`;
-  inside=`<path d="M0 538l93-55h814l93 55v122H0Z" fill="var(--env-pane)" stroke="var(--env-frame)" stroke-width="6"/>${rect(46,519,244,74,'#24465d','rx="9"')}${rect(710,519,244,74,'#24465d','rx="9"')}<path d="M76 541h162m-162 18h105m601-18h136" stroke="#84bfd1" stroke-width="4"/><g>${rect(791,422,77,59,'#e4eeee','rx="23"')}${rect(803,438,52,21,'#24465d','rx="8"')}<circle cx="817" cy="449" r="4" fill="#91d7bd"/><circle cx="841" cy="449" r="4" fill="#91d7bd"/></g>`;
+  inside=interior+`<g>${rect(791,422,77,59,'#e4eeee','rx="23"')}${rect(803,438,52,21,'#24465d','rx="8"')}<circle cx="817" cy="449" r="4" fill="#91d7bd"/><circle cx="841" cy="449" r="4" fill="#91d7bd"/></g>`;
  }else{
   outside=`<g><path d="M-130 371L80 267L215 320L373 126L506 288L721 99L936 305L1120 232V500H-130Z" fill="var(--env-city)"/><path d="M320 192l53-66l63 80l-50-26l-16 10l-22-17m316 1l57-75l59 83l-35-27l-20 10l-15-20" fill="#e9f1ea"/>${props}${times(10).map(i=>`<path d="M${i*120-90} 446l20-69l21 69Z" fill="#345b54"/>`).join('')}</g>`;
-  inside=rect(0,495,1000,165,'var(--env-wall)')+rect(0,554,279,106,'#527774','rx="25"')+rect(723,554,277,106,'#527774','rx="25"')+rect(280,558,440,24,'var(--env-wood)','rx="10"')+lamp+(id==='tokyo'?props:'')+cat;
+  inside=interior+cat;
  }
  return `<svg viewBox="0 0 1000 660" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="${sky}" x2="0" y2="1"><stop stop-color="var(--env-sky)"/><stop offset="1" stop-color="var(--env-horizon)"/></linearGradient><clipPath id="${clip}"><rect x="31" y="24" width="938" height="454" rx="${id==='starship'?80:24}"/></clipPath></defs>${rect(0,0,1000,660,'var(--env-wall)')}<g clip-path="url(#${clip})">${rect(0,0,1000,490,`url(#${sky})`)}${outside}</g><rect x="30" y="23" width="940" height="456" rx="${id==='starship'?80:24}" fill="none" stroke="var(--env-frame)" stroke-width="15"/>${id==='starship'?'':'<path d="M331 26v450m338-450v450" stroke="var(--env-frame)" stroke-width="9"/>'}${inside}</svg>`;
 }

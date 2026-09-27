@@ -19,6 +19,7 @@ try:
         browser=p.chromium.launch(**args)
         context=browser.new_context(viewport={'width':1440,'height':1100})
         context.tracing.start(screenshots=True,snapshots=True,sources=True)
+        code='ABCDE-12345-ABCDE-12345'
         page=context.new_page();errors=[];calls=[];state={'ready':False,'role':None,'enabled':False}
         page.on('pageerror',lambda e:errors.append(str(e)))
         page.add_init_script('window.cspErrors=[];document.addEventListener("securitypolicyviolation",e=>cspErrors.push(e.violatedDirective));')
@@ -38,7 +39,10 @@ try:
                 else:state['role']='user';data={'user':{'email':'member@example.test','role':'user'}}
             elif action=='me':
                 if state['role'] is None:data={'error':{'code':'SIGN_IN_REQUIRED','message':'Sign into your ChatDrobe account.'}};status=401
-                else:data={'user':{'id':'fixture','email':'member@example.test','role':state['role']},'subscription':{'plan':'free','status':'free','paidUntil':None,'cancelAtPeriodEnd':False},'payments':{'enabled':state['enabled'],'mode':'test' if state['enabled'] else 'off','livePayments':False}}
+                else:data={'extensionLinkingAvailable':True,'access':{'premium':False},'user':{'id':'fixture','email':'member@example.test','role':state['role']},'subscription':{'plan':'free','status':'free','paidUntil':None,'cancelAtPeriodEnd':False},'payments':{'enabled':state['enabled'],'mode':'test' if state['enabled'] else 'off','livePayments':False}}
+            elif action=='devices':data={'devices':[]}
+            elif action=='health':data={'signing':{'ready':True,'matchesExtension':True}}
+            elif action=='link-extension':assert body=={'code':code,'confirmed':True};data={'linked':True}
             elif action=='admin-users':
                 assert state['role']=='admin'
                 data={'users':[{'id':'fixture','email':'<img src=x onerror=alert(1)>@example.test','plan':'test_plus','role':'user','subscription_status':'active','created_at':'2026-09-16T12:00:00Z','last_login_at':'2026-09-16T13:00:00Z','disabled_at':None}],'total':1,'page':body.get('page',1),'pageSize':25,'counts':{'registered':2,'free':1,'test_plus':1,'paid_live':0},'asOf':1789570000,'coverage':'Registered, email-verified accounts only. Test subscriptions are not live paying users.'}
@@ -50,7 +54,7 @@ try:
             route.fulfill(status=status,content_type='application/json',body=json.dumps(data),headers={'Cache-Control':'no-store'})
         page.route('**/api/*',api)
         try:
-            response=page.goto(BASE+'/signup/',wait_until='networkidle')
+            response=page.goto(BASE+'/signup/?next=account&flow=extension#link='+code,wait_until='networkidle')
             assert "connect-src 'self'" in response.headers['content-security-policy']
             expect(page.locator('[data-auth-email]')).to_be_hidden()
             expect(page.locator('[data-account-message]')).to_contain_text('not connected')
@@ -61,7 +65,12 @@ try:
             page.get_by_label('Eight-digit email code').fill('00000000');page.get_by_role('button',name='Verify and continue').click()
             expect(page.locator('[data-account-message]')).to_contain_text('invalid')
             page.get_by_label('Eight-digit email code').fill('12345678');page.get_by_role('button',name='Verify and continue').click()
-            expect(page).to_have_url(BASE+'/account/')
+            expect(page).to_have_url(BASE+'/account/?flow=extension#link='+code)
+            expect(page.locator('[data-connection-success]')).to_have_attribute('data-state','needs-approval')
+            expect(page.get_by_label('Code shown in your extension')).to_have_value(code)
+            page.get_by_label('I started this connection',exact=False).check();page.get_by_role('button',name='Connect this extension',exact=True).click()
+            expect(page.locator('[data-connection-success]')).to_have_attribute('data-state','connected-free')
+            expect(page).to_have_url(BASE+'/account/?flow=extension')
             expect(page.locator('[data-account-email]')).to_have_text('member@example.test')
             expect(page.get_by_role('button',name='Start Stripe test checkout')).to_be_disabled()
             expect(page.locator('[data-account-admin]')).to_be_hidden()

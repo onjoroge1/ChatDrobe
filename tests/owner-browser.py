@@ -33,6 +33,7 @@ try:
                 else:
                     admin=state['role']=='admin';plus=state['plan']=='test_plus'
                     data={'extensionLinkingAvailable':True,'rememberedDays':30,'user':{'email':'owner@example.test','role':state['role'],'emailVerified':False},'subscription':{'plan':state['plan'],'status':'active' if plus else 'free'},'payments':{'enabled':False,'mode':'off'},'access':{'premium':admin or plus,'complimentary':admin,'source':'admin' if admin else 'stripe_test' if plus else 'free'}}
+            elif action=='health':data={'signing':{'ready':True,'matchesExtension':True}}
             elif action=='devices':data={'devices':([{'id':'a'*64,'extension_id':'b'*32,'linked_at':'2026-09-20T18:00:00Z','expires_at':'2026-10-20T18:00:00Z'}] if state['linked'] else [])}
             elif action=='link-extension':
                 assert body=={'code':code,'confirmed':True};state['linked']=True;data={'linked':True}
@@ -40,12 +41,12 @@ try:
             elif action=='signout':state['signed']=False;data={'ok':True}
             else:raise AssertionError('Unexpected action '+action)
             route.fulfill(status=status,content_type='application/json',body=json.dumps(data))
-        page.route('**/api/account?*',api)
-        page.goto(BASE+'/signin/?next=account#link='+code,wait_until='networkidle')
+        page.route('**/api/*',api)
+        page.goto(BASE+'/signin/?next=account&flow=extension#link='+code,wait_until='networkidle')
         page.locator('[data-account-page]').get_by_role('link',name='Create an account',exact=True).click()
-        expect(page).to_have_url(BASE+'/signup/?next=account#link='+code)
+        expect(page).to_have_url(BASE+'/signup/?next=account&flow=extension#link='+code)
         page.locator('[data-account-page]').get_by_role('link',name='Sign in',exact=True).click()
-        expect(page).to_have_url(BASE+'/signin/?next=account#link='+code)
+        expect(page).to_have_url(BASE+'/signin/?next=account&flow=extension#link='+code)
         expect(page.get_by_label('Owner email',exact=True)).to_be_hidden()
         state['owner']=True;page.reload();expect(page.get_by_label('Owner email',exact=True)).to_be_visible()
         expect(page.locator('[data-auth-email]')).to_be_hidden()
@@ -57,17 +58,18 @@ try:
         expect(page.get_by_label('Owner password',exact=True)).to_have_value('')
         page.get_by_label('Owner password',exact=True).fill('fixture-long-owner-password')
         page.get_by_role('button',name='Sign in as owner',exact=True).click()
-        expect(page).to_have_url(BASE+'/account/#link='+code)
+        expect(page).to_have_url(BASE+'/account/?flow=extension#link='+code)
         expect(page.locator('[data-account-plan]')).to_have_text('Admin Premium — complimentary')
         expect(page.locator('[data-account-checkout]')).to_be_hidden()
         expect(page.locator('[data-account-subscription]')).to_contain_text('No purchase is needed')
         expect(page.get_by_label('Code shown in your extension')).to_have_value(code)
+        expect(page.locator('[data-connection-success]')).to_have_attribute('data-state','needs-approval')
         page.get_by_role('button',name='Connect this extension',exact=True).click()
         assert 'link-extension' not in calls
         page.get_by_label('I started this connection',exact=False).check()
         page.get_by_role('button',name='Connect this extension',exact=True).click()
         expect(page.get_by_text('Connection approved. Return to the extension to check signed access',exact=False)).to_be_visible()
-        expect(page).to_have_url(BASE+'/account/')
+        expect(page).to_have_url(BASE+'/account/?flow=extension')
         expect(page.get_by_role('button',name='Disconnect',exact=True)).to_be_visible()
         page.on('dialog',lambda dialog:dialog.accept())
         page.get_by_role('button',name='Disconnect',exact=True).click()

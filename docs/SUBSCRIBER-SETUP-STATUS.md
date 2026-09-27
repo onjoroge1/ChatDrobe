@@ -1,5 +1,7 @@
 # Subscriber access and setup status
 
+> Historical milestone, superseded by the email-code account and device-link implementation. Do not use the Supabase configuration below for the current application. Current setup: [ACCOUNTS-ADMIN-PAYMENTS.md](ACCOUNTS-ADMIN-PAYMENTS.md). Current activation evidence and blockers: [ACTIVATION-READINESS.md](ACTIVATION-READINESS.md). The old helper remains isolated; the deployed account flow uses the application's own verified accounts and opaque sessions.
+
 ## Exact implementation boundary
 
 Added to the payment branch:

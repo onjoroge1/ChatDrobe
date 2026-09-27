@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {livingArt} from '../src/living-collection.mjs';
-import {staticCatArt,staticWorldProps} from '../src/living-static-art.mjs';
+import {staticCatArt,staticWorldProps,staticInteriorArt} from '../src/living-static-art.mjs';
 import {WORLD_ART} from '../browser-extension/extension/living/art/world-art.mjs';
 import {TOKYO_PLANT_ART} from '../browser-extension/extension/living/art/tokyo-plant-art.mjs';
+import {INTERIOR_ART} from '../browser-extension/extension/living/art/interior-art.mjs';
 
 const geometry=specs=>specs.flatMap(([,attrs,children=[]])=>[...(attrs.d?[attrs.d]:[]),...geometry(children)]);
 test('static website cats keep the canonical rest anatomy without animation or CSS-dependent paths',()=>{
@@ -35,4 +36,14 @@ test('repeated no-JavaScript world illustrations have local, unique SVG referenc
  for(const[,id]of art.matchAll(/url\(#([^)]+)\)/g))assert.ok(ids.includes(id),id);
  assert.equal((art.match(/data-artwork="canonical-cat"/g)||[]).length,6);
  for(const name of ['dicebear-sprouts','dicebear-landscape','dicebear-planets'])assert.equal((art.match(new RegExp(`data-artwork="${name}"`,'g'))||[]).length,3);
+});
+test('static interiors reuse the actual scene layers with resolved website palette tokens',()=>{
+ for(const[id,layers]of Object.entries(INTERIOR_ART)){
+  const art=staticInteriorArt(id,'interior-'+id),world=livingArt(id,'world-'+id);
+  for(const layer of Object.keys(layers))assert.ok(world.includes(`data-interior="${id}-${layer}"`));
+  for(const d of Object.values(layers).flatMap(geometry))assert.ok(art.includes(`d="${d}"`),`${id}: shared interior geometry`);
+  for(const[,token]of art.matchAll(/var\(--([^)]+)\)/g))assert.ok(['env-wall','env-wood','env-frame','env-pane','env-carriage-seat'].includes(token),`${id}: ${token}`);
+  assert.doesNotMatch(art,/<script|<foreignObject|<animate|\son\w+=|\shref=|\sstyle=/);
+ }
+ assert.throws(()=>staticInteriorArt('unknown','test'));
 });

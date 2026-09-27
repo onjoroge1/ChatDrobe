@@ -9,7 +9,7 @@ export function writeLivingAssets(root,assets){
  const read=name=>fs.readFileSync(path.join(sourceRoot,name),'utf8');
  const base=read('scene.mjs'),start=base.indexOf('export const SCENE_CSS=`'),end=base.indexOf('export function createScene');
  if(start<0||end<=start)throw new Error('Review the changed scene module before bundling.');
- const baseRenderer=(base.slice(0,start)+base.slice(end)).replace("from './model.mjs'","from './living-model.js'");
+ const baseRenderer=(base.slice(0,start)+base.slice(end)).replace("from './model.mjs'","from './living-model.js'").replaceAll("'./art/","'./living-art/");
  const quiet=read('quiet-scene.mjs'),quietStart=quiet.indexOf('export const QUIET_CSS=`'),quietEnd=quiet.indexOf("const DETAIL_NS=");
  if(quietStart<0||quietEnd<=quietStart)throw new Error('Review the changed quiet-scene module before bundling.');
  const renderer=(quiet.slice(0,quietStart)+quiet.slice(quietEnd))

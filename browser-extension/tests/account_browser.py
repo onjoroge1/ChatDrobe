@@ -1,11 +1,11 @@
 """Actual Chromium rendering; mocked worker replies, not native extension IPC."""
 from pathlib import Path
-import re
+import os,re
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[1];E=ROOT/'extension'
 (ROOT/'preview').mkdir(exist_ok=True)
 with sync_playwright() as p:
- b=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True)
+ b=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH') or None,headless=True)
  page=b.new_page(viewport={'width':1100,'height':950});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  html=re.sub(r'<script[^>]*>.*?</script>|<link[^>]*>','',(E/'account.html').read_text())
  page.set_content(html);page.add_style_tag(content=(E/'upgrade.css').read_text());page.add_style_tag(content=(E/'account.css').read_text())
@@ -17,8 +17,8 @@ with sync_playwright() as p:
  page.evaluate("linked=true;window.dispatchEvent(new Event('focus'))")
  expect(page.locator('#email')).to_have_text('member@example.test');expect(page.locator('#plan')).to_have_text('Free')
  page.get_by_role('button',name='View account / test checkout').click();assert page.evaluate("calls.includes('billing-website')")
- page.evaluate('plus=true');page.get_by_role('button',name='Refresh access').click();expect(page.locator('#plan')).to_contain_text('Test Plus');expect(page.locator('#website')).to_be_hidden();expect(page.locator('#continue')).to_be_visible()
- page.evaluate("admin=true;window.dispatchEvent(new Event('focus'))");expect(page.locator('#plan')).to_have_text('Admin Premium — complimentary');expect(page.locator('#status')).to_contain_text('Premium is ready');expect(page.locator('#remembered')).to_contain_text('30 days');expect(page.locator('#website')).to_be_hidden()
+ page.evaluate('plus=true');page.get_by_role('button',name='Check access and world').click();expect(page.locator('#plan')).to_contain_text('Test Plus');expect(page.locator('#website')).to_be_hidden();expect(page.locator('#continue')).to_be_visible()
+ page.evaluate("admin=true;window.dispatchEvent(new Event('focus'))");expect(page.locator('#plan')).to_have_text('Admin Premium — complimentary');expect(page.locator('#status')).to_contain_text('access verified');expect(page.locator('#remembered')).to_contain_text('30 days');expect(page.locator('#website')).to_be_hidden()
  for width in [360,390,768,1200]:
   page.set_viewport_size({'width':width,'height':950});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),width
  page.screenshot(path=str(ROOT/'preview/admin-premium.png'),full_page=True)

@@ -28,6 +28,34 @@ async function updateBillingSnapshot(){
  if(access.premium&&saved[PENDING]){state=MoodDockCore.reduce(state,{type:'settings',value:safeTarget(saved[PENDING],state.prefs)});await chrome.storage.local.set({mooddock:state,[PENDING]:null});}
  await snapshotFor(state,access);return access;});queue=run;return run;
 }
+// Account UI receives only the chosen appearance and a bounded page acknowledgement.
+// A saved preference or a valid entitlement alone does not prove a world is visible.
+async function accountActivation(access){
+ const saved=await chrome.storage.local.get(['mooddock',PENDING,PREF_KEY]);
+ const prefs=MoodDockCore.state(saved.mooddock).prefs,pending=!!saved[PENDING];
+ const chosen=pending?{...prefs,...safeTarget(saved[PENDING],prefs)}:prefs;
+ const selection=MoodDockCore.experience(chosen);
+ const name=selection.kind==='living'?({tokyo:'Rainy Tokyo Loft',starship:'Starship Journey',train:'Cozy Train Journey'}[selection.id]):selection.kind==='companion'?'Cat companion':MoodDockCore.themeById(selection.id).name;
+ const requiresPremium=!!ChatDrobeAccess.requiresPremium(chosen),available=!requiresPremium||access.premium;
+ const base={selection:{...selection,name},pending,requiresPremium,available,revision:saved[PREF_KEY]?.revision??-1};
+ if(!available)return {...base,state:'awaiting-access',reason:'Your choice is saved until Premium access is verified.'};
+ if(!chosen.enabled)return {...base,state:'off',reason:'Your appearance is saved, but ChatDrobe is turned off.',action:'Turn ChatDrobe on in the extension workspace.'};
+ let timer,expired=false;
+ const inspect=async()=>{
+  const tabs=await chrome.tabs.query({url:'https://chatgpt.com/*'});if(expired)return;
+  const tab=tabs.find(t=>t.active)||tabs[0];
+  if(!Number.isInteger(tab?.id))return {...base,state:'saved',reason:'Your choice is saved. Open ChatGPT to display it.'};
+  const reply=await chrome.tabs.sendMessage(tab.id,{scope:'mooddock',kind:'diagnostics'}),actual=reply?.ok&&reply.experience;
+  if(!actual||actual.revision!==base.revision||actual.kind!==selection.kind||actual.id!==selection.id||actual.motion!==selection.motion)return {...base,state:'waiting',reason:'The selected appearance has not reached this ChatGPT tab yet.',action:'Open ChatGPT and refresh that tab once, then check again.'};
+  if(actual.visible===true)return {...base,state:'displayed',reason:typeof actual.reason==='string'?actual.reason.slice(0,240):'The selected appearance is displayed in ChatGPT.',motionAllowed:actual.motionAllowed===true};
+  // Never copy a page response wholesale into the trusted account surface.
+  const state=['blocked','loading','paused','off'].includes(actual.state)?actual.state:'saved';
+  return {...base,state,reason:typeof actual.reason==='string'?actual.reason.slice(0,240):'Settings reached ChatGPT. Open the tab to check visibility.',action:typeof actual.action==='string'?actual.action.slice(0,160):''};
+ };
+ try{return await Promise.race([inspect(),new Promise((_,reject)=>{timer=setTimeout(()=>{expired=true;reject(Error('Page check timed out.'));},1500);})]);}
+ catch{return {...base,state:'unreachable',reason:'ChatGPT has not acknowledged this extension.',action:'Open ChatGPT and refresh that tab once, then check again.'};}
+ finally{expired=true;clearTimeout(timer);}
+}
 
 async function settleFocus(){
  const raw=(await chrome.storage.local.get(FOCUS_KEY))[FOCUS_KEY]||{};
@@ -88,14 +116,15 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
      result=await billing.status();await chrome.tabs.create({url:result.verificationUrl||'https://www.chatdrobe.com/account/?flow=extension'});
     }else if(k==='billing-return'){
      result=await billing.ensure();await updateBillingSnapshot();
-     if(!result.premium)throw Error(result.lastError||'Premium has not been verified. Check access before returning.');
+     const saved=await chrome.storage.local.get(['mooddock',PENDING]),prefs=MoodDockCore.state(saved.mooddock).prefs,chosen=saved[PENDING]?{...prefs,...safeTarget(saved[PENDING],prefs)}:prefs;
+     if(!result.premium&&ChatDrobeAccess.requiresPremium(chosen))throw Error(result.lastError||'Premium has not been verified. Check access before returning.');
      const tabs=await chrome.tabs.query({url:'https://chatgpt.com/*'});
      const target=tabs.find(t=>t.active)||tabs[0];
      if(Number.isInteger(target?.id)){await chrome.tabs.update(target.id,{active:true});if(Number.isInteger(target.windowId))await chrome.windows?.update(target.windowId,{focused:true});}
      else await chrome.tabs.create({url:'https://chatgpt.com/'});
     }
     else result=await billing.ensure();
-    await updateBillingSnapshot();respond({ok:true,billing:result});
+    await updateBillingSnapshot();result=await billing.status();respond({ok:true,billing:{...result,activation:await accountActivation(result)}});
    }catch(e){respond({ok:false,error:e.message||'Account operation failed.'});}
   })();return true;
  }

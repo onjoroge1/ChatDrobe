@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
-import {connectionState,linkCode,linkFragment,authLink} from '../src/connection-flow.js';
+import {connectionState,linkCode,linkFragment,authLink,authDestination} from '../src/connection-flow.js';
 const good={ready:true,matchesExtension:true,status:'ready'},admin={user:{email:'owner@example.test'},access:{premium:true,complimentary:true}},subscriber={user:{email:'user@example.test'},access:{premium:true},subscription:{plan:'test_plus'}},free={user:{email:'user@example.test'},access:{premium:false},subscription:{plan:'free'}};
 test('a fabricated checkout return never upgrades a Free or signed-out user',()=>{assert.equal(connectionState(free,true,good,true).kind,'payment-pending');assert.equal(connectionState(null,true,good,true).kind,'signed-out');});
 test('an old linked device cannot imply this installation is ready',()=>{
@@ -27,3 +27,17 @@ test('pending approval survives sign-in and signup navigation only as a validate
 });
 
 test('a cached subscription label cannot override a server denial of Premium access',()=>{assert.equal(connectionState({...subscriber,access:{premium:false}},true,good).kind,'choose-plan');});
+
+test('extension intent survives both authentication routes without allowing an external redirect',()=>{
+ const hash='#link=ABCDE-12345-ABCDE-12345';
+ for(const path of ['/signin/','/signup/'])assert.equal(authLink(path,'?next=account&flow=extension&redirect=https://evil.test',hash),path+'?next=account&flow=extension'+hash);
+ assert.equal(authDestination('?next=account&flow=extension',hash),'/account/?flow=extension'+hash);
+ assert.equal(authDestination('?next=admin&flow=extension',hash),'/admin/'+hash);
+ for(const search of ['?next=https://evil.test','?next=//evil.test','?flow=attacker'])assert.equal(authDestination(search,'#link=invalid'),'/account/');
+});
+test('an attached approval code provides a connection step before returning to ChatGPT',()=>{
+ for(const profile of [admin,subscriber,free]){const state=connectionState(profile,true,good,false,false,false,true);assert.equal(state.kind,'needs-approval');assert.match(state.detail,/attached code/);}
+ assert.equal(connectionState(null,false,good,false,false,false,true).kind,'signed-out');
+ assert.equal(connectionState(free,true,good,false,false,true).kind,'connected-free');
+ assert.equal(connectionState(admin,true,good,false,false,true,true).kind,'needs-extension-check');
+});
