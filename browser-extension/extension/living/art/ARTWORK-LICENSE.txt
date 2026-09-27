@@ -1,24 +1,36 @@
-Tokyo planted reading nook — curated artwork
+ChatDrobe curated world artwork
 
-Two potted plant props derive from Sprouts by DiceBear.
-Source: https://www.dicebear.com/styles/sprouts/
+Selected vector components derive from these collections by DiceBear:
+- Sprouts by DiceBear: two potted plant compositions for Tokyo.
+  https://www.dicebear.com/styles/sprouts/
+- Landscape by DiceBear: three hill contours for Train.
+  https://www.dicebear.com/styles/landscape/
+- Planets by DiceBear: terra, cratered and banded surfaces, and soft shading for Starship.
+  https://www.dicebear.com/styles/planets/
+
 Source package: @dicebear/styles 10.6.0
 Source repository: https://github.com/dicebear/styles
-Artwork dedication: CC0 1.0 Universal
+Each selected collection's artwork dedication: CC0 1.0 Universal
 https://creativecommons.org/publicdomain/zero/1.0/
 Legal text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
 
-The source definition includes this notice:
+The source definitions include these notices:
 “Sprouts” (https://www.dicebear.com) by “DiceBear”, licensed under
 “CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/).
+“Landscape” (https://www.dicebear.com) by “DiceBear”, licensed under
+“CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/).
+“Planets” (https://www.dicebear.com) by “DiceBear”, licensed under
+“CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/).
 
-ChatDrobe selected plant and pot components, removed avatar faces/backgrounds and
-upstream animation, recolored the props, namespaced SVG references, and composed
-them in the existing Tokyo scene. DiceBear does not endorse ChatDrobe.
+ChatDrobe selected static components, omitted faces/backgrounds and upstream
+animation/randomization, mapped selected colors to existing lighting palettes,
+namespaced SVG references, and composed the art in its existing world stages.
+DiceBear does not endorse ChatDrobe.
 
-This dedication applies to the selected Sprouts artwork only. The original
+This dedication applies to the selected DiceBear artwork only. The original
 ChatDrobe cat rig, world layout, code and the Lottie pilot retain their respective
 ownership/licenses. No DiceBear runtime or remote avatar request is included.
 
-Machine-readable source, version, component selections and checksums are recorded
-in art-sources.json. Reproduction: tools/artwork/README.md in the source repository.
+Machine-readable sources, versions, component selections and checksums are
+recorded in art-sources.json and world-art-sources.json. Reproduction:
+tools/artwork/README.md in the source repository.

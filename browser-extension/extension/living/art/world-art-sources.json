@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "package": "@dicebear/styles",
+  "version": "10.6.0",
+  "repository": "https://github.com/dicebear/styles",
+  "collections": [
+    {
+      "world": "train",
+      "style": "landscape",
+      "source": "https://www.dicebear.com/styles/landscape/",
+      "definition": "https://cdn.hopjs.net/npm/@dicebear/styles@10.6.0/dist/landscape.min.json",
+      "definitionSha256": "c74f8be95b6c1aac3af1461400c2db947b9fa9728da4ccfd098d9a415b70fecb",
+      "creator": {
+        "name": "DiceBear",
+        "url": "https://www.dicebear.com"
+      },
+      "license": {
+        "name": "CC0 1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "text": "„Landscape” (https://www.dicebear.com) by „DiceBear”, licensed under „CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/)"
+      },
+      "selections": [
+        {
+          "id": "distant-ridge",
+          "component": "hill1",
+          "variant": "ridge"
+        },
+        {
+          "id": "rolling-fields",
+          "component": "hill2",
+          "variant": "rolling"
+        },
+        {
+          "id": "near-meadow",
+          "component": "hill3",
+          "variant": "gentle"
+        }
+      ],
+      "changes": [
+        "Selected three static hill contours; omitted upstream randomness, orb, background and animation.",
+        "Mapped hill colors to existing Train journey and day/dusk/night palette variables.",
+        "Placed contours behind existing carriage, trees and cottage; retained mountain and city stages."
+      ]
+    },
+    {
+      "world": "starship",
+      "style": "planets",
+      "source": "https://www.dicebear.com/styles/planets/",
+      "definition": "https://cdn.hopjs.net/npm/@dicebear/styles@10.6.0/dist/planets.min.json",
+      "definitionSha256": "42c1bf78610f51dd605c23d1f7b16747f3b7775cff8a3aac993a9e2c2a9f581e",
+      "creator": {
+        "name": "DiceBear",
+        "url": "https://www.dicebear.com"
+      },
+      "license": {
+        "name": "CC0 1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "text": "„Planets” (https://www.dicebear.com) by „DiceBear”, licensed under „CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/)"
+      },
+      "selections": [
+        {
+          "id": "earth-surface",
+          "component": "surface",
+          "variant": "terra"
+        },
+        {
+          "id": "moon-surface",
+          "component": "surface",
+          "variant": "cratered"
+        },
+        {
+          "id": "jupiter-surface",
+          "component": "surface",
+          "variant": "banded"
+        },
+        {
+          "id": "planet-shade",
+          "component": "shade",
+          "variant": "soft"
+        }
+      ],
+      "changes": [
+        "Selected terra, cratered and banded surfaces and soft shading; omitted stars, rings, moons, randomness and animation.",
+        "Removed the dbpa-surface CSS marker; the original ChatDrobe scheduler controls motion.",
+        "Prefixed every SVG ID/reference and fitted surfaces to the existing planet disc.",
+        "Display Earth, Moon and Jupiter surfaces only in their matching journey stages; retain asteroid and deep-space stages."
+      ]
+    }
+  ],
+  "output": "world-art.mjs",
+  "outputSha256": "ac63263452832ce4d5ce973bc239a632c18140a52a79918bce4d65a3f03ac801"
+}

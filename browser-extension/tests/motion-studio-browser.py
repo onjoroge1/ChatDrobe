@@ -154,6 +154,11 @@ try:
                 if closeup:
                     scrub(page, action, 50)
                     room.locator('.companion-habitat').screenshot(path=str(OUT / f'cat-pose-{action}.png'))
+            # The curl once crossed the SVG floor only between its endpoint
+            # poses. Inspect the full transition in both rendered sizes.
+            for percent in range(101):
+                scrub(page, 'curl', percent)
+                assert_inside(cat, 'curl', percent, mode)
             scrub(page, 'look', 0)
             page.locator('#scene-shell').screenshot(path=str(OUT / f'motion-studio-{mode}.png'))
         assert widths['closeup'] >= widths['compact'] * 2, widths
@@ -173,7 +178,11 @@ try:
                 page.locator('#world').select_option(world)
                 expect(page.locator('#scene').locator('.room')).to_have_attribute('data-world', world)
                 page.locator('#night').check()
+                if width in [390, 1440]:
+                    page.locator('#scene-shell').screenshot(path=str(OUT / f'world-{world}-night-{width}.png'))
                 page.locator('#night').uncheck()
+                if width in [390, 1440]:
+                    page.locator('#scene-shell').screenshot(path=str(OUT / f'world-{world}-day-{width}.png'))
                 page.locator('#play').click()
                 page.locator('#stop').click()
         ok('Three environments, day/night and playback controls fit all four viewport sizes')

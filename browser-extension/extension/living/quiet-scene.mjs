@@ -2,6 +2,7 @@ import {createScene as baseScene,SCENE_CSS as BASE_CSS} from './scene.mjs';
 import {createCatRig} from './companion-rig.mjs';
 import {CLIPS} from './companion-motion.mjs';
 import {addTokyoNook} from './art/tokyo-nook.mjs';
+import {addTrainLandscape,addStarshipSurfaces} from './art/journey-art.mjs';
 import {createLottiePilot} from './lottie-pilot.mjs';
 /* One original articulated companion in a bounded margin habitat. Never samples a page. */
 export const QUIET_CSS=`
@@ -23,6 +24,15 @@ export const QUIET_CSS=`
 .room[data-world=tokyo]{--nook-leaf:#769886;--nook-pot:#d7a484;--wall:#eddfcc;--wood:#82624f;--frame:#a78e71;--pane:#fbefdb}
 .room[data-world=tokyo][data-light=dusk]{--nook-leaf:#708b7d;--nook-pot:#bd927e;--wall:#dbc1ac;--wood:#855e53;--frame:#9d8277;--pane:#e6cdb8}
 .room[data-world=tokyo][data-light=night]{--nook-leaf:#516f65;--nook-pot:#94776b;--wall:#302d35;--wood:#574650;--frame:#786779;--pane:#493e4b}
+.room[data-world=train]{--carriage-seat:#527674;--wall:#ede2cf;--wood:#806850;--frame:#a78f6f;--pane:#fbf0dc}
+.room[data-world=train][data-light=dusk]{--carriage-seat:#506361;--wall:#d8c0b0;--wood:#805f53;--frame:#9c8070;--pane:#e7cdb9}
+.room[data-world=train][data-light=night]{--carriage-seat:#314b4c;--wall:#2d3238;--wood:#514b4c;--frame:#6f7076;--pane:#42494e}
+.room[data-world=train][data-stage="3"][data-light=dusk]{--grass:#b1bcc1;--field:#a0aeb7;--far:#8b8da2;--near:#646e87}
+.room[data-world=train][data-stage="3"][data-light=night]{--grass:#607478;--field:#465e66;--far:#576478;--near:#334c59}
+.room[data-world=train][data-stage="4"][data-light=night]{--sky:#252841;--sky-low:#665469;--grass:#52615b;--field:#40564e}
+.room[data-world=train] [data-layer=carriage]>rect[rx="33"]{fill:var(--carriage-seat)}
+.room[data-world=starship] [data-art-surface]{display:none}
+.room[data-world=starship][data-stage="0"] [data-art-surface=earth],.room[data-world=starship][data-stage="1"] [data-art-surface=moon],.room[data-world=starship][data-stage="3"] [data-art-surface=jupiter]{display:inline}
 .room .lottie-steam-pilot{width:100%;height:100%;pointer-events:none;overflow:hidden}
 .room[data-light=night] .tea-steam{stroke:#e7d0be}
 .room[data-motion=true][data-active=true] .tea-steam{opacity:.22;animation:habitat-steam 16s ease-in-out infinite}
@@ -51,6 +61,8 @@ export function createScene(doc,definition){
    pilot=createLottiePilot(doc,{container,fallback});
   }
  }
+ if(definition.id==='train')addTrainLandscape(doc,scene.element);
+ if(definition.id==='starship')addStarshipSurfaces(doc,scene.element);
  if(definition.id==='train'&&view){const near=n('g',{'data-depth':'near',opacity:'.28',fill:'var(--near)'});for(let i=0;i<7;i++)near.append(n('path',{d:`M${-85+i*175} 475l25-52l25 52Z`}));view.append(near);}
  function cancelDrone(){for(const a of activeAnimations){a.onfinish=null;a.cancel();}activeAnimations=[];}
  function droneClip(pose){

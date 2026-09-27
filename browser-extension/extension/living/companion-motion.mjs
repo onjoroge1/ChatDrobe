@@ -36,7 +36,12 @@ export function catPose(action='rest',t=0){
   p.shoulder=blend(p.shoulder,[149,135],w);p.hip=blend(p.hip,[205,129],w);
   p.head=blend(p.head,[146,130],w);p.headAngle=mix(-3,-17,w);p.spine=mix(1,.91,w);
   p.frontNear=blend(p.frontNear,[132,158],w);p.frontFar=blend(p.frontFar,[163,155],w);
-  p.hindNear=blend(p.hindNear,[197,158],w);p.tail=p.tail.map((a,i)=>mix(a,[112,38,28,20,12][i],w));
+  p.hindNear=blend(p.hindNear,[197,158],w);
+  // Curl from the tip inward before turning the base toward the paws. Blending
+  // all five angles together briefly straightens the tail downward through the
+  // habitat floor. A traveling fold keeps its length and attached root intact.
+  p.tail=p.tail.map((a,i)=>i===0?mix(a,112,ramp(w,.5,.8)):
+   mix(a,70,ramp(w,(4-i)*.12,(4-i)*.12+.18))+([112,38,28,20,12][i]-70)*ramp(w,.8,1));
   p.eye=1-ramp(w,.45,.88);p.sleep=w;p.earL=-6*w;p.earR=9*w;
   if(action==='curl'){p.headAngle+=4*wave(t,0,.24,1);p.pupil[0]=-2*(1-w);}
  }

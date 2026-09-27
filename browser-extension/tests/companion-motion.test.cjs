@@ -7,5 +7,18 @@ test('grooming coordinates paw and muzzle rather than moving disconnected parts'
 test('stretch lowers shoulders and raises hips with explicit supported foot targets',async()=>{const {catPose}=await get();const p=catPose('stretch',.55);assert.ok(p.shoulder[1]>130);assert.ok(p.hip[1]<110);assert.equal(p.frontNear[1],159);assert.equal(p.frontFar[1],156);assert.ok(p.frontNear[0]<90);});
 test('kneading alternates the two front paws instead of bouncing the entire actor',async()=>{const {catPose}=await get();let near=false,far=false;for(let i=20;i<82;i++){const p=catPose('knead',i/100);if(p.frontNear[1]<150)near=true;if(p.frontFar[1]<149)far=true;assert.ok(p.frontNear[1]===157||p.frontFar[1]===155);}assert.ok(near&&far);});
 test('non-sleep clips return exactly to rest; curling ends in the same sleeping shape',async()=>{const {catFrame,CLIPS}=await get();const rest=catFrame('rest',0);for(const a of Object.keys(CLIPS).filter(a=>!['curl','inspect','dock','calibrate'].includes(a)))assert.deepEqual(catFrame(a,1),rest,a);assert.deepEqual(catFrame('curl',1),catFrame('sleep',0));});
+test('curl tail paint stays inside the habitat throughout the fold, including between keyframes',async()=>{
+ const {catFrame,compileCatClip}=await get();
+ const frames=Array.from({length:1001},(_,i)=>catFrame('curl',i/1000));
+ frames.push(catFrame('sleep',0));
+ // Absolute M/L/Q coordinates bound the whole Bezier curve, not only its
+ // endpoints. Include the tail-band stroke radius in its paint bounds.
+ const inside=(bone,d)=>{const coordinates=d.match(/-?\d+(?:\.\d+)?/g).map(Number),padding=bone==='tailBands'?1.7:0;
+  for(let i=0;i<coordinates.length;i+=2){assert.ok(coordinates[i]>=padding&&coordinates[i]<=320-padding,`${bone} x ${coordinates[i]}`);assert.ok(coordinates[i+1]>=padding&&coordinates[i+1]<=190-padding,`${bone} y ${coordinates[i+1]}`);}};
+ for(const f of frames)for(const bone of ['tailSkin','tailBands'])inside(bone,f[bone].d);
+ // WAAPI interpolates these actual path coordinates; bounded control points
+ // at every compiled keyframe also bound each interpolated segment.
+ const clip=compileCatClip('curl');for(const bone of ['tailSkin','tailBands'])for(const f of clip.tracks[bone])inside(bone,f.d);
+});
 test('explicit companion imports retain the selection but never grant Premium access',()=>{const p=P.prefs({idleMode:'natural',livingBehavior:'progressive'});assert.equal(p.idleMode,'natural');assert.ok(A.requiresPremium(p));const free=A.effective(p,{premium:false});assert.equal(free.idleMode,'off');const imp=C.importAppearance(JSON.stringify({format:'chatdrobe-appearance',version:1,prefs:p}));assert.equal(imp.idleMode,'natural');assert.equal(imp.wordBitesConsent,false);assert.equal(A.effective(imp,{premium:false}).idleMode,'off');});
 test('journey lighting preference survives sanitization; motion remains off by default',()=>{const p=P.prefs({livingTime:'journey'});assert.equal(p.livingTime,'journey');assert.equal(p.livingMotion,false);assert.equal(P.prefs({livingBehavior:'unknown'}).livingBehavior,'progressive');assert.equal(P.prefs({livingBehavior:'subtle'}).livingBehavior,'subtle');});

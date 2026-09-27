@@ -88,6 +88,41 @@ try:
             page.get_by_label('Journey progress').fill('65');expect(room).to_have_attribute('data-stage','3')
             expect(page.locator('[data-env-chapter]')).to_contain_text('Snow country')
             page.screenshot(path=str(OUT/'living-motion-premium.png'),full_page=True)
+            # Review curated geometry through the same controls customers see.
+            # Named destinations must not accidentally show another planet's skin.
+            page.goto(BASE+'/living-worlds/')
+            page.locator('.env-options summary').click()
+            for world,name,artwork in [('tokyo','Rainy Tokyo Loft','tokyo-nook-v1'),
+                                       ('train','Cozy Train Journey','train-landscape-v1'),
+                                       ('starship','Starship Journey','starship-orbit-v1')]:
+                page.get_by_role('button',name=name,exact=True).click()
+                expect(room).to_have_attribute('data-artwork',artwork)
+                expect(preview).to_have_attribute('data-motion','false')
+                for light in ['day','dusk','night']:
+                    points=['0','30','60','100'] if world=='tokyo' else ['0','25','45','65','100']
+                    for stage,progress in enumerate(points):
+                        page.get_by_label('Journey progress').fill(progress)
+                        expect(room).to_have_attribute('data-stage',str(stage))
+                        page.get_by_label('Lighting',exact=True).select_option(light)
+                        expect(room).to_have_attribute('data-light',light)
+                        if world=='starship':
+                            visible_surface={0:'earth',1:'moon',3:'jupiter'}.get(stage)
+                            for surface in ['earth','moon','jupiter']:
+                                skin=room.locator(f'[data-art-surface="{surface}"]')
+                                assert skin.count()==1
+                                assert skin.is_visible()==(surface==visible_surface),(light,stage,surface)
+                        # Freeze at Still so images can be compared across reviews.
+                        if light=='day' or stage==0:
+                            page.locator('.env-stage').screenshot(path=str(OUT/f'art-{world}-{light}-stage-{stage}.png'))
+                if world=='train':
+                    for prop in ['distant-ridge','rolling-fields','near-meadow']:
+                        expect(room.locator(f'[data-art-prop="{prop}"]')).to_have_count(1)
+                # Gradient and clip references must resolve inside this shadow root.
+                assert room.evaluate('''room => {
+                  const root=room.getRootNode();
+                  return [...room.querySelectorAll('*')].every(node => [...node.attributes].every(attr =>
+                    [...attr.value.matchAll(/url\\(#([^)]*)\\)/g)].every(match => root.getElementById(match[1]))));
+                }'''),world
             page.goto(BASE+'/themes/');expect(page.locator('.env-card')).to_have_count(3);expect(page.locator('.world-card')).to_have_count(15)
             page.locator('.env-card a[href="/living-worlds/#train"]').click();expect(page).to_have_url(BASE+'/living-worlds/#train')
             expect(page.locator('#train h2')).to_have_text('Cozy Train Journey')
@@ -108,8 +143,9 @@ try:
             expect(bad.locator('[data-env-room="tokyo"]').first).to_be_visible();failure.close()
             assert not errors,errors
             assert all(url.startswith(BASE) for url in requests),'Unexpected third-party request'
-            (OUT/'living-checks.json').write_text(json.dumps({'passed':['visible Still renderer and lazy player loading under existing CSP','accelerated chapters, pause and scrub','weather, idle, return, streaming and Quiet Focus','Portal geometry and reduced motion','offscreen pause','five pages at four widths','catalog, pricing, keyboard and no-JavaScript','load failure keeps the static fallback']}))
-            print('8 Living website HTTP browser groups passed.')
+            assert page.evaluate('window.cspViolations')==[],page.evaluate('window.cspViolations')
+            (OUT/'living-checks.json').write_text(json.dumps({'passed':['visible Still renderer and lazy player loading under existing CSP','accelerated chapters, pause and scrub','weather, idle, return, streaming and Quiet Focus','Portal geometry and reduced motion','offscreen pause','five pages at four widths','catalog, pricing, keyboard and no-JavaScript','load failure keeps the static fallback','curated artwork: every chapter at day/dusk/night with correct planet surfaces and local references']}))
+            print('9 Living website HTTP browser groups passed.')
         finally:
             context.tracing.stop(path=str(OUT/'living-trace.zip'));browser.close()
 finally:
