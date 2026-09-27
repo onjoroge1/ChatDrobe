@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatDrobe \u2014 Themes & Workspace (Sandbox Test)",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "Original themes, reading controls and a local workspace for use with ChatGPT. Independent; not affiliated with OpenAI.",
   "minimum_chrome_version": "120",
   "permissions": [
@@ -69,6 +69,10 @@
         "living/companion-motion.mjs",
         "living/companion-rig.mjs",
         "living/lottie-pilot.mjs",
+        "living/art/svg-art.mjs",
+        "living/art/interior-art.mjs",
+        "living/art/journey-art.mjs",
+        "living/art/world-art.mjs",
         "living/art/tokyo-nook.mjs",
         "living/art/tokyo-plant-art.mjs",
         "living/art/tokyo-steam.mjs",

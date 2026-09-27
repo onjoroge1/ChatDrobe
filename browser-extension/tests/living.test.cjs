@@ -31,3 +31,23 @@ test('focus duration bounds prohibit invalid or excessively long sessions',()=>{
 test('environment renderer cannot read text, make network requests or run a frame loop',()=>{const code=fs.readFileSync(path.join(__dirname,'../extension/living/engine.mjs'),'utf8');for(const pattern of [/\.textContent\b/,/\.innerHTML\b/,/\.value\b/,/fetch\(/,/setInterval\(/])assert.doesNotMatch(code,pattern);assert.match(code,/attributeFilter:/);});
 test('background timer endpoints cannot be called by page or upgrade origins',()=>{const code=fs.readFileSync(path.join(__dirname,'../extension/background.js'),'utf8');assert.match(code,/from==='page'&&k==='read-prefs'/);assert.match(code,/chrome\.alarms\?\.onAlarm/);});
 test('package paths expose only bundled engine modules on chatgpt.com',()=>{const E=path.join(__dirname,'../extension'),m=require('../extension/manifest.json');assert.equal(m.version,require('../package.json').version);for(const war of m.web_accessible_resources){assert.deepEqual(war.matches,['https://chatgpt.com/*']);for(const f of war.resources)assert.ok(fs.existsSync(path.join(E,f)));}assert.ok(!m.content_scripts[0].js.some(f=>f.includes('living')));});
+test('content-script module entry points expose every static and lazy transitive import',()=>{
+ const E=path.join(__dirname,'../extension'),manifest=require('../extension/manifest.json');
+ const exposed=new Set(manifest.web_accessible_resources.filter(rule=>rule.matches.includes('https://chatgpt.com/*')).flatMap(rule=>rule.resources));
+ const boot=fs.readFileSync(path.join(E,'boot.js'),'utf8');
+ const entries=[...boot.matchAll(/import\(chrome\.runtime\.getURL\(['"]([^'"]+)['"]\)\)/g)].map(match=>match[1]);
+ assert.ok(entries.includes('living/engine.mjs'));assert.ok(entries.includes('idle.js'));
+ const visited=new Set();
+ function visit(file){
+  if(visited.has(file))return;visited.add(file);
+  assert.ok(exposed.has(file),`Module imported on ChatGPT is missing from web_accessible_resources: ${file}`);
+  const source=fs.readFileSync(path.join(E,file),'utf8').replace(/^\s*\/\/.*$/gm,'');
+  for(const match of source.matchAll(/(?:\b(?:import|export)\s+[^;\n]*?\s+from\s*|\bimport\s*\(\s*|\bimport\s*)['"]([^'"]+)['"]/g)){
+   const specifier=match[1];assert.ok(specifier.startsWith('./')||specifier.startsWith('../'),`Runtime import must be bundled: ${specifier}`);
+   const dependency=path.posix.normalize(path.posix.join(path.posix.dirname(file),specifier));
+   assert.ok(!dependency.startsWith('../'),`Import escapes extension: ${dependency}`);visit(dependency);
+  }
+ }
+ for(const entry of entries)visit(entry);
+ assert.ok(visited.has('living/art/journey-art.mjs'));assert.ok(visited.has('living/vendor/lottie-light-5.13.0.mjs'),'lazy player is checked too');
+});

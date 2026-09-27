@@ -4,7 +4,7 @@ const Core=require('../extension/core.js'),Focus=require('../extension/focus-sta
 const hash=v=>createHash('sha256').update(v).digest('hex');
 function worker({existing=true}={}){
  const id='a'.repeat(32),data={mooddock:Core.state({notes:'PRIVATE NOTE'}),'chatdrobe:access-beta-v1':{testerPreview:true,premium:true}},broadcasts=[],opened=[],activated=[],alarms=new Map(),alarmHandlers=[];
- let permission=false,linked=false,plan='free',source=null,now=1700000000000,listener,level;
+ let permission=false,linked=false,plan='free',source=null,now=1700000000000,listener,level,pageReply=null,query=()=>existing?[{id:1,windowId:2,active:true}]:[];
  const {privateKey,publicKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'}),config={channel:'sandbox',allowTesterPreview:false,billingOrigin:'https://www.chatdrobe.com',entitlementKey:{keyId:'test',publicJwk:publicKey.export({format:'jwk'})}};
  const storage={setAccessLevel:async v=>level=v.accessLevel,get:async keys=>Object.fromEntries((Array.isArray(keys)?keys:[keys]).map(k=>[k,structuredClone(data[k])])),set:async v=>Object.assign(data,structuredClone(v))};
  const requests=[];
@@ -16,11 +16,11 @@ function worker({existing=true}={}){
    const raw=[h,p].map(x=>Buffer.from(JSON.stringify(x)).toString('base64url')).join('.');body={linked:true,plan,environment:'test',account:{email:'member@example.test'},token:raw+'.'+sign('sha256',Buffer.from(raw),{key:privateKey,dsaEncoding:'ieee-p1363'}).toString('base64url')};
   }else body={ok:true};return new Response(JSON.stringify(body),{status:200});
  };
- const chrome={runtime:{id,getURL:p=>'chrome-extension://'+id+'/'+p,onMessage:{addListener:fn=>listener=fn},onInstalled:{addListener:()=>{}},onStartup:{addListener:()=>{}}},storage:{local:storage},permissions:{contains:async()=>permission},sidePanel:{setPanelBehavior:async()=>{}},tabs:{query:async()=>existing?[{id:1,windowId:2,active:true}]:[],update:async(id,v)=>activated.push({id,...v}),create:async v=>opened.push(v.url),sendMessage:async(_,v)=>broadcasts.push(structuredClone(v)),onUpdated:{addListener:()=>{}}},alarms:{get:async k=>alarms.get(k),create:async(k,v)=>alarms.set(k,v),clear:async k=>alarms.delete(k),onAlarm:{addListener:fn=>alarmHandlers.push(fn)}}};
- const ctx=vm.createContext({chrome,MoodDockCore:Core,ChatDrobeFocus:Focus,ChatDrobeAccess:Access,ChatDrobeCommerceConfig:config,ChatDrobeBilling:{...Billing,create:o=>Billing.create({...o,fetcher,now:()=>now,cryptoApi:webcrypto,verify:Entitlement.verify})},crypto:webcrypto,URL,console,importScripts:()=>{}});
+ const chrome={runtime:{id,getURL:p=>'chrome-extension://'+id+'/'+p,onMessage:{addListener:fn=>listener=fn},onInstalled:{addListener:()=>{}},onStartup:{addListener:()=>{}}},storage:{local:storage},permissions:{contains:async()=>permission},sidePanel:{setPanelBehavior:async()=>{}},tabs:{query:async()=>query(),update:async(id,v)=>activated.push({id,...v}),create:async v=>opened.push(v.url),sendMessage:async(_,v)=>v.kind==='diagnostics'?(typeof pageReply==='function'?pageReply():pageReply):broadcasts.push(structuredClone(v)),onUpdated:{addListener:()=>{}}},alarms:{get:async k=>alarms.get(k),create:async(k,v)=>alarms.set(k,v),clear:async k=>alarms.delete(k),onAlarm:{addListener:fn=>alarmHandlers.push(fn)}}};
+ const ctx=vm.createContext({chrome,MoodDockCore:Core,ChatDrobeFocus:Focus,ChatDrobeAccess:Access,ChatDrobeCommerceConfig:config,ChatDrobeBilling:{...Billing,create:o=>Billing.create({...o,fetcher,now:()=>now,cryptoApi:webcrypto,verify:Entitlement.verify})},crypto:webcrypto,URL,console,setTimeout,clearTimeout,importScripts:()=>{}});
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../extension/background.js'),'utf8'),ctx);
  const send=(kind,extra={},from='workspace.html')=>new Promise(resolve=>{const u=from.startsWith('http')?from:'chrome-extension://'+id+'/'+from;const r=listener({scope:'mooddock',kind,...extra},{id,url:u},resolve);if(r===false)resolve({ignored:true});});
- return {send,data,broadcasts,opened,activated,requests,alarms,permit:()=>permission=true,link:()=>linked=true,plus:()=>{plan='plus';source='stripe_test';},admin:()=>{plan='plus';source='admin';},free:()=>{plan='free';source='free';},advance:ms=>now+=ms,expire:()=>alarmHandlers.forEach(fn=>fn({name:Billing.EXPIRY})),get level(){return level;}};
+ return {send,data,broadcasts,opened,activated,requests,alarms,page:v=>pageReply=v,query:v=>query=v,permit:()=>permission=true,link:()=>linked=true,plus:()=>{plan='plus';source='stripe_test';},admin:()=>{plan='plus';source='admin';},free:()=>{plan='free';source='free';},advance:ms=>now+=ms,expire:()=>alarmHandlers.forEach(fn=>fn({name:Billing.EXPIRY})),get level(){return level;}};
 }
 test('sandbox worker ignores legacy tester flags and rejects account operations from ChatGPT pages',async()=>{const w=worker();assert.equal((await w.send('read')).access.premium,false);assert.equal(w.level,'TRUSTED_CONTEXTS');assert.equal((await w.send('tester-preview',{enabled:true})).ok,false);for(const kind of ['billing-start','billing-refresh','billing-disconnect','billing-status','open-account'])assert.equal((await w.send(kind,{},'https://chatgpt.com/c/test')).ok,false);assert.equal(w.requests.length,0);});
 test('connection requires explicit optional permission and preserves the protected account page role',async()=>{const w=worker();assert.equal((await w.send('billing-start')).ok,false);assert.equal(w.requests.length,0);w.permit();const r=await w.send('billing-start',{},'account.html');assert.equal(r.ok,true);assert.equal(w.opened.at(-1),'https://www.chatdrobe.com/account/#link=ABCDE-12345-ABCDE-12345');assert.equal((await w.send('read',{},'account.html')).ok,false);assert.equal((await w.send('billing-status',{},'account.html')).ok,true);});
@@ -34,7 +34,7 @@ test('an expired cached proof refreshes and applies the Living world without a p
 test('demotion or cancellation is enforced on a refreshed selection without deleting notes',async()=>{const w=worker();w.permit();await w.send('billing-start');w.link();w.admin();await w.send('billing-refresh');w.free();w.advance(61000);const result=await w.send('open-upgrade',{world:'starlit'});assert.equal(result.applied,false);assert.ok(w.opened.at(-1).endsWith('/account.html'));assert.ok(!w.opened.at(-1).includes('upgrade.html'));assert.equal((await w.send('read')).access.premium,false);assert.equal(w.data.mooddock.notes,'PRIVATE NOTE');});
 
 test('approval button reopens the SAME code link without starting or revoking a connection',async()=>{const w=worker();w.permit();await w.send('billing-start',{},'account.html');const count=w.requests.length;const r=await w.send('billing-website',{},'account.html');assert.equal(r.ok,true);assert.equal(w.requests.length,count);assert.match(w.opened.at(-1),/#link=ABCDE-12345-ABCDE-12345$/);});
-test('Open ChatGPT refuses unverified access and untrusted page messages',async()=>{const w=worker();const before=w.opened.length;const r=await w.send('billing-return',{},'account.html');assert.equal(r.ok,false);assert.equal(w.opened.length,before);assert.equal(w.activated.length,0);assert.equal((await w.send('billing-return',{},'https://chatgpt.com/c/test')).ok,false);});
+test('Open ChatGPT refuses unverified Premium choices and untrusted page messages',async()=>{const w=worker();await w.send('open-upgrade',{world:'starlit'});const before=w.opened.length;const r=await w.send('billing-return',{},'account.html');assert.equal(r.ok,false);assert.equal(w.opened.length,before);assert.equal(w.activated.length,0);assert.equal((await w.send('billing-return',{},'https://chatgpt.com/c/test')).ok,false);});
 test('Open ChatGPT applies the pending Premium world before focusing a tab or opening the homepage',async()=>{for(const existing of [true,false]){const w=worker({existing});w.permit();await w.send('open-upgrade',{world:'starlit'});await w.send('billing-start');w.link();w.admin();const r=await w.send('billing-return',{},'account.html');assert.equal(r.ok,true);assert.equal((await w.send('read')).state.prefs.theme,'starlit');assert.equal(w.data.mooddock.notes,'PRIVATE NOTE');if(existing){assert.equal(w.activated.at(-1).id,1);assert.equal(w.activated.at(-1).active,true);}else assert.equal(w.opened.at(-1),'https://chatgpt.com/');}});
 test('canonical pending selection preserves motion and scene options through account approval',async()=>{const w=worker();const target={kind:'living',id:'train',motion:'playful',livingWeather:'snow',livingView:'full',livingTime:'night',mode:'dark',wordBitesConsent:true,remote:'https://evil.test'};await w.send('open-upgrade',{target});const pending=w.data['chatdrobe:pending-upgrade-v1'];assert.equal(pending.livingMotion,true);assert.equal(pending.wordBitesConsent,undefined);assert.equal(pending.remote,undefined);w.permit();await w.send('billing-start');w.link();w.plus();await w.send('billing-refresh');const r=await w.send('read');assert.deepEqual(Core.experience(r.desiredPrefs),{kind:'living',id:'train',motion:'playful'});for(const [key,value] of Object.entries({livingWeather:'snow',livingView:'full',livingTime:'night',mode:'dark'}))assert.equal(r.state.prefs[key],value);assert.equal(r.revision,w.data['mooddock:prefs-v2'].revision);});
 test('a later Free selection cancels queued Premium intent before account approval',async()=>{const w=worker();await w.send('open-upgrade',{target:{kind:'living',id:'starship',motion:'subtle'}});assert.ok(w.data['chatdrobe:pending-upgrade-v1']);const selected=await w.send('mutate',{action:{type:'select-experience',value:{kind:'theme',id:'ocean',motion:'still'}}});assert.equal(selected.ok,true);assert.equal(w.data['chatdrobe:pending-upgrade-v1'],null);w.permit();await w.send('billing-start');w.link();w.plus();await w.send('billing-refresh');assert.equal((await w.send('read')).state.prefs.theme,'ocean');assert.equal(w.data.mooddock.prefs.livingEnabled,false);});
@@ -53,4 +53,41 @@ test('pending same-world motion preserves custom accent and decoration through v
   assert.equal(restored.state.prefs.accent,'#123abc');assert.equal(restored.state.prefs.decoration,false);assert.equal(restored.state.prefs.enabled,true);
   assert.equal(w.data['chatdrobe:pending-upgrade-v1'],null);
  }
+});
+
+test('account progress names the saved world and motion before approval without exposing local content',async()=>{
+ const w=worker();await w.send('open-upgrade',{target:{kind:'living',id:'train',motion:'playful'}});
+ const result=await w.send('billing-status',{},'account.html'),a=result.billing.activation;
+ assert.deepEqual(JSON.parse(JSON.stringify(a.selection)),{kind:'living',id:'train',motion:'playful',name:'Cozy Train Journey'});
+ assert.equal(a.pending,true);assert.equal(a.state,'awaiting-access');assert.ok(!JSON.stringify(a).includes('PRIVATE NOTE'));
+});
+
+test('verified access never claims the world is displayed without the matching current page acknowledgement',async()=>{
+ const w=worker();await w.send('open-upgrade',{target:{kind:'living',id:'train',motion:'playful'}});w.permit();await w.send('billing-start');w.link();w.plus();
+ const saved=await w.send('billing-refresh',{},'account.html');assert.equal(saved.billing.premium,true);assert.equal(saved.billing.activation.pending,false);assert.equal(saved.billing.activation.state,'waiting');
+ const snapshot=w.data['mooddock:prefs-v2'],actual={revision:snapshot.revision,...Core.experience(snapshot.prefs),visible:true,state:'displayed',reason:'Portal displayed; motion enabled.',motionAllowed:true};
+ for(const mismatch of [{revision:actual.revision-1},{id:'tokyo'},{kind:'theme'},{motion:'still'}]){w.page({ok:true,experience:{...actual,...mismatch}});assert.equal((await w.send('billing-status',{},'account.html')).billing.activation.state,'waiting');}
+ w.page({ok:true,experience:{...actual,visible:false,state:'blocked',reason:'No safe display space.',action:'Widen the window.'}});const blocked=(await w.send('billing-status',{},'account.html')).billing.activation;assert.equal(blocked.state,'blocked');assert.equal(blocked.reason,'No safe display space.');assert.equal(blocked.action,'Widen the window.');
+ w.page({ok:true,experience:actual});const displayed=(await w.send('billing-status',{},'account.html')).billing.activation;assert.equal(displayed.state,'displayed');assert.equal(displayed.motionAllowed,true);
+ w.page(()=>{throw Error('No receiver');});assert.equal((await w.send('billing-status',{},'account.html')).billing.activation.state,'unreachable');
+});
+
+test('verified choice with no ChatGPT tab is saved but not reported as displayed',async()=>{
+ const w=worker({existing:false});await w.send('open-upgrade',{world:'starlit'});w.permit();await w.send('billing-start');w.link();w.admin();const r=await w.send('billing-refresh',{},'account.html');assert.equal(r.billing.activation.state,'saved');assert.equal(r.billing.activation.selection.name,'Starlit Cat');
+});
+
+test('a Free theme remains available after account connection without a Premium upsell or revision churn',async()=>{
+ const w=worker();w.permit();await w.send('billing-start');w.link();const linked=await w.send('billing-refresh',{},'account.html');assert.equal(linked.billing.connected,true);assert.equal(linked.billing.premium,false);assert.equal(linked.billing.activation.available,true);assert.equal(linked.billing.activation.requiresPremium,false);
+ const snapshot=w.data['mooddock:prefs-v2'];w.page({ok:true,experience:{revision:snapshot.revision,...Core.experience(snapshot.prefs),visible:true,state:'applied'}});
+ const returned=await w.send('billing-return',{},'account.html');assert.equal(returned.ok,true);assert.equal(returned.billing.activation.state,'displayed');assert.equal(returned.billing.activation.revision,snapshot.revision);assert.equal(w.activated.at(-1).id,1);
+ assert.equal((await w.send('billing-status',{},'account.html')).billing.activation.revision,snapshot.revision);
+});
+
+test('an unresponsive page cannot leave the account action waiting indefinitely',async()=>{
+ for(const boundary of ['page','query']){const w=worker();w[boundary](()=>new Promise(()=>{}));const result=await w.send('billing-status',{},'account.html');assert.equal(result.ok,true);assert.equal(result.billing.activation.state,'unreachable');}
+});
+
+
+test('a failed tab query preserves successful connection and access information',async()=>{
+ const w=worker();w.permit();await w.send('billing-start');w.link();await w.send('billing-refresh');w.query(()=>{throw Error('Tabs unavailable');});const result=await w.send('billing-status',{},'account.html');assert.equal(result.ok,true);assert.equal(result.billing.connected,true);assert.equal(result.billing.activation.state,'unreachable');
 });

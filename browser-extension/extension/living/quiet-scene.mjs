@@ -4,6 +4,7 @@ import {CLIPS} from './companion-motion.mjs';
 import {addTokyoNook} from './art/tokyo-nook.mjs';
 import {addTrainLandscape,addStarshipSurfaces} from './art/journey-art.mjs';
 import {createLottiePilot} from './lottie-pilot.mjs';
+import {TOKYO_TEA_OFFSET} from './art/interior-art.mjs';
 /* One original articulated companion in a bounded margin habitat. Never samples a page. */
 export const QUIET_CSS=`
 .caption{display:none!important}
@@ -30,7 +31,6 @@ export const QUIET_CSS=`
 .room[data-world=train][data-stage="3"][data-light=dusk]{--grass:#b1bcc1;--field:#a0aeb7;--far:#8b8da2;--near:#646e87}
 .room[data-world=train][data-stage="3"][data-light=night]{--grass:#607478;--field:#465e66;--far:#576478;--near:#334c59}
 .room[data-world=train][data-stage="4"][data-light=night]{--sky:#252841;--sky-low:#665469;--grass:#52615b;--field:#40564e}
-.room[data-world=train] [data-layer=carriage]>rect[rx="33"]{fill:var(--carriage-seat)}
 .room [data-art-surface]{display:none}
 .room[data-stage="0"] [data-art-surface=earth],.room[data-stage="1"] [data-art-surface=moon],.room[data-stage="3"] [data-art-surface=jupiter]{display:inline}
 .room .lottie-steam-pilot{width:100%;height:100%;overflow:hidden}
@@ -54,8 +54,8 @@ export function createScene(doc,definition){
   addTokyoNook(doc,scene.element);
   const desk=scene.element.querySelector('[data-layer="desk"]');
   if(desk){
-   const fallback=n('path',{class:'tea-steam',d:'M688 487q-6-9 0-17t0-17M703 486q7-8 0-15t0-15'});
-   const frame=n('foreignObject',{x:674,y:430,width:52,height:64,'aria-hidden':'true','data-lottie-pilot':'tea-steam'});
+   const fallback=n('path',{class:'tea-steam',d:`M${688+TOKYO_TEA_OFFSET} 487q-6-9 0-17t0-17M${703+TOKYO_TEA_OFFSET} 486q7-8 0-15t0-15`});
+   const frame=n('foreignObject',{x:674+TOKYO_TEA_OFFSET,y:430,width:52,height:64,'aria-hidden':'true','data-lottie-pilot':'tea-steam'});
    const container=doc.createElement('div');container.className='lottie-steam-pilot';frame.append(container);desk.append(fallback,frame);
    pilot=createLottiePilot(doc,{container,fallback});
   }

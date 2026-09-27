@@ -1,6 +1,6 @@
 # Creative implementation and remaining work
 
-Status checked 2026-09-27. PR26 is merged into main. PR27 / version 0.9.1 is the cat and world-art review build; it is not a public launch certification. This inventory distinguishes delivered code, experiments and proposals so a library installation is not mistaken for finished product artwork.
+Status checked 2026-09-27. PR26 and PR27 are merged into main. Version 0.9.1 contains the cat and world-art review changes; it is not a public launch certification. This inventory distinguishes delivered code, experiments and proposals so a library installation is not mistaken for finished product artwork. See [ACTIVATION-READINESS.md](ACTIVATION-READINESS.md) for the current sign-in and installation blockers.
 
 ## What the integrations actually supply
 
@@ -21,7 +21,7 @@ The Lottie pilot's passing PR26 CI recorded 387,358 bytes raw / 72,092 gzip, 11 
 | PR | Status at review | Action |
 | --- | --- | --- |
 | [26 — immediate controls, Tokyo art and Lottie pilot](https://github.com/onjoroge1/ChatDrobe/pull/26) | Merged | Verify the actual installed package; merging does not refresh an unpacked extension. |
-| [27 — cat and curated world artwork](https://github.com/onjoroge1/ChatDrobe/pull/27) | Open review build | Review the new cat, corrected curl trajectory and Train/Starship artwork; complete native acceptance before release. |
+| [27 — cat and curated world artwork](https://github.com/onjoroge1/ChatDrobe/pull/27) | Merged | Review the new cat, corrected curl trajectory and Train/Starship artwork; complete native acceptance before release. |
 | [25 — premium repair](https://github.com/onjoroge1/ChatDrobe/pull/25) | Merged | Close the remaining acceptance gaps in `PREMIUM-REPAIR-ACCEPTANCE.md`. |
 | [18 — quiet companions](https://github.com/onjoroge1/ChatDrobe/pull/18) | Open; renderer work largely incorporated by later changes | Check for unique test/documentation value, then reconcile or close as superseded. Do not restore old renderer copies. |
 | [12 — Living engine roadmap](https://github.com/onjoroge1/ChatDrobe/pull/12) | Open; docs-only proposal with old package/account assumptions | Extract the still-useful roadmap into current documentation; no hidden runtime implementation waits in this PR. |

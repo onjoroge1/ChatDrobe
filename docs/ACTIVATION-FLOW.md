@@ -1,5 +1,7 @@
 # Clear connection and activation — v0.6.2
 
+> Historical signing-repair milestone. The current 0.9.2 flow adds explicit pending approval, preserved sign-in intent, selected-world status and a bounded page acknowledgement. See [ACTIVATION-READINESS.md](ACTIVATION-READINESS.md) for current live evidence and remaining setup. The signing-key blocker described below is resolved at the production configuration boundary.
+
 ## Reported blocker
 The user successfully approved an installation, then saw ACCESS_SIGNING_NOT_READY and a Free label. Production logs showed repeated /api/extension 503 requests. That specific error originates while loading BILLING_SIGNING_PRIVATE_KEY, before a Premium proof is issued. The user should not be asked to reconnect or purchase to repair server configuration.
 

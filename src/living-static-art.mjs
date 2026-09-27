@@ -2,6 +2,7 @@ import {createCatRig} from '../browser-extension/extension/living/companion-rig.
 import {createSvgArt} from '../browser-extension/extension/living/art/svg-art.mjs';
 import {TOKYO_PLANT_ART} from '../browser-extension/extension/living/art/tokyo-plant-art.mjs';
 import {WORLD_ART} from '../browser-extension/extension/living/art/world-art.mjs';
+import {INTERIOR_ART} from '../browser-extension/extension/living/art/interior-art.mjs';
 
 // Build-time only: serialize checked-in artwork through the same constructors as
 // the extension. This is deliberately not an SVG upload parser or a browser DOM.
@@ -61,4 +62,10 @@ export function staticWorldProps(id,instance){
   ['g',{'data-art-prop':'planet-shade',transform:'translate(661 103) scale(3.4333)'},WORLD_ART.starship['planet-shade']]
  ]],instance);
  throw new Error('Unknown static world artwork.');
+}
+
+export function staticInteriorArt(id,instance){
+ const layers=INTERIOR_ART[id];if(!layers)throw new Error('Unknown static interior artwork.');
+ return Object.entries(layers).map(([layer,nodes])=>art(['g',{'data-interior':id+'-'+layer},nodes],instance)).join('')
+  .replaceAll(/var\(--(wood|frame|pane|wall)\)/g,(_,name)=>`var(--env-${name})`).replaceAll('var(--carriage-seat,#527674)','var(--env-carriage-seat)');
 }
