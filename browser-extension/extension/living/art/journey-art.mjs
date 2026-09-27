@@ -22,6 +22,8 @@ export function addStarshipSurfaces(doc,room){
  const root=room.querySelector(':scope > svg'),planet=root?.querySelector('[data-layer="planet"]');
  const surface=planet?.querySelector('g[clip-path="url(#cd-planet)"]');
  if(!surface)return;
+ // The shared daylight sun overlaps this world's planet; space has its own bodies.
+ root.querySelector('[data-layer="sky"] .sun')?.remove();
  const create=spec=>createSvgArt(doc,spec);
  // DiceBear's surface is centered at (34,33), its shade at (30,30).
  // Fit both to the existing center (735,184), radius 99, without replacing stages.

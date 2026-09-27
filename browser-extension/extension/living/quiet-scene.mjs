@@ -7,19 +7,19 @@ import {createLottiePilot} from './lottie-pilot.mjs';
 /* One original articulated companion in a bounded margin habitat. Never samples a page. */
 export const QUIET_CSS=`
 .caption{display:none!important}
-.room .traffic,.room .craft,.room .drone,.room .signal{animation:none!important}
+.room :is(.traffic,.craft,.drone,.signal){animation:none!important}
 .room[data-weather=rain] .rain{opacity:.22!important}
 .room[data-weather=snow] .snow{opacity:.4!important}
 .room[data-weather=aurora] .aurora{opacity:.17!important}
 .room .landscape-move{animation-duration:100s!important}
 .room .planet-turn{animation-duration:240s!important}
-.companion-habitat{position:absolute;right:0;bottom:0;width:48%;aspect-ratio:320/190;overflow:hidden;pointer-events:none;contain:layout style paint}
-.companion-habitat>svg{display:block;width:100%;height:100%;overflow:hidden}
+.companion-habitat{position:absolute;right:0;bottom:0;width:48%;aspect-ratio:320/190;overflow:hidden;contain:layout style paint}
+.companion-habitat>svg{overflow:hidden}
 .companion-cat [data-bone]{transform-box:view-box;transform-origin:0 0}
 .room[data-stage="3"] .windows{opacity:.8}
 .room [data-depth=near]{transform-box:fill-box;transform-origin:center}
-.room[data-motion=true][data-active=true][data-idle-stage=unwinding] [data-depth=near]{animation:habitat-landscape 110s linear infinite alternate}
-.room[data-motion=true][data-active=true][data-idle-stage=comfortable] [data-depth=near]{animation:habitat-landscape 140s linear infinite alternate}
+.room[data-motion=true][data-active=true]:is([data-idle-stage=unwinding],[data-idle-stage=comfortable]) [data-depth=near]{animation:habitat-landscape var(--landscape-duration,110s) linear infinite alternate}
+.room[data-idle-stage=comfortable]{--landscape-duration:140s}
 .room .tea-steam{fill:none;stroke:#f8e9d2;stroke-width:2.2;opacity:0}
 .room[data-world=tokyo]{--nook-leaf:#769886;--nook-pot:#d7a484;--wall:#eddfcc;--wood:#82624f;--frame:#a78e71;--pane:#fbefdb}
 .room[data-world=tokyo][data-light=dusk]{--nook-leaf:#708b7d;--nook-pot:#bd927e;--wall:#dbc1ac;--wood:#855e53;--frame:#9d8277;--pane:#e6cdb8}
@@ -31,15 +31,14 @@ export const QUIET_CSS=`
 .room[data-world=train][data-stage="3"][data-light=night]{--grass:#607478;--field:#465e66;--far:#576478;--near:#334c59}
 .room[data-world=train][data-stage="4"][data-light=night]{--sky:#252841;--sky-low:#665469;--grass:#52615b;--field:#40564e}
 .room[data-world=train] [data-layer=carriage]>rect[rx="33"]{fill:var(--carriage-seat)}
-.room[data-world=starship] [data-art-surface]{display:none}
-.room[data-world=starship][data-stage="0"] [data-art-surface=earth],.room[data-world=starship][data-stage="1"] [data-art-surface=moon],.room[data-world=starship][data-stage="3"] [data-art-surface=jupiter]{display:inline}
-.room .lottie-steam-pilot{width:100%;height:100%;pointer-events:none;overflow:hidden}
+.room [data-art-surface]{display:none}
+.room[data-stage="0"] [data-art-surface=earth],.room[data-stage="1"] [data-art-surface=moon],.room[data-stage="3"] [data-art-surface=jupiter]{display:inline}
+.room .lottie-steam-pilot{width:100%;height:100%;overflow:hidden}
 .room[data-light=night] .tea-steam{stroke:#e7d0be}
 .room[data-motion=true][data-active=true] .tea-steam{opacity:.22;animation:habitat-steam 16s ease-in-out infinite}
-.room[data-busy=true] *,.room[data-active=false] *,.room[data-motion=false] *,.room[data-focused=true][data-quiet=true] *{animation-play-state:paused!important}
+.room[data-busy=true] *,.room[data-focused=true][data-quiet=true] *{animation-play-state:paused!important}
 @keyframes habitat-landscape{to{transform:translateX(-85px)}}
 @keyframes habitat-steam{0%,100%{opacity:.08;transform:translateY(0)}50%{opacity:.25;transform:translateY(-5px)}}
-@media(prefers-reduced-motion:reduce){.room *{animation:none!important;transition:none!important}}
 `;
 export const SCENE_CSS=BASE_CSS+QUIET_CSS;
 const DETAIL_NS='http://www.w3.org/2000/svg';

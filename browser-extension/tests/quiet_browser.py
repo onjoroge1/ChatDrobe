@@ -24,6 +24,28 @@ def wait_for_state(page,expression):
   if page.evaluate(expression):return
   page.clock.run_for(50)
  raise AssertionError('Page state did not settle within 5 seconds: '+expression)
+def wait_for_painted_gap(page):
+ """Wait for real paint and measure all protected bounds in the same DOM read.
+
+ diagnostics() synchronously measures layout, but a later ResizeObserver can
+ provisionally hide fallback art until its next RAF. With an installed clock,
+ returning on diagnostic visibility alone can strand that frame before a
+ separate Playwright bounding_box() call. Do not force layout through another
+ diagnostics call here: recovery must happen through the renderer's own RAF.
+ """
+ for _ in range(100):
+  page.clock.run_for(50)
+  geometry=page.evaluate("""() => {
+   const host=document.querySelector('#chatdrobe-environment');
+   const message=document.querySelector('[data-message-author-role="assistant"]');
+   const composer=document.querySelector('#composer-background');
+   if(!host||host.hidden||getComputedStyle(host).display==='none'||!host.getClientRects().length)return null;
+   const box=node=>{if(!node)return null;const r=node.getBoundingClientRect();return r.width>0&&r.height>0?{x:r.x,y:r.y,width:r.width,height:r.height}:null;};
+   const bounds=box(host),messageBounds=box(message),composerBounds=box(composer);
+   return bounds&&messageBounds&&composerBounds?{bounds,message:messageBounds,composer:composerBounds}:null;
+  }""")
+  if geometry:return geometry
+ raise AssertionError('Fallback artwork did not recover a painted box within 5 seconds')
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=os.getenv('CHROMIUM_PATH',shutil.which('chromium')),headless=True,args=['--no-sandbox'])
  page=browser.new_page(viewport={'width':1720,'height':1050});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
@@ -101,7 +123,7 @@ with sync_playwright() as p:
  page.set_viewport_size({'width':900,'height':1050})
  page.evaluate("document.querySelector('.markdown').innerHTML='<p>A short fixture response.</p>';applyRoom({livingWorld:'tokyo',livingMotion:false})")
  wait_for_state(page,"()=>{const d=env.diagnostics();return d.visible&&d.layout?.fallback==='conversation-gap';}")
- bounds=page.locator('#chatdrobe-environment').bounding_box();message=page.locator('[data-message-author-role="assistant"]').bounding_box();composer=page.locator('#composer-background').bounding_box()
+ geometry=wait_for_painted_gap(page);bounds=geometry['bounds'];message=geometry['message'];composer=geometry['composer']
  assert bounds['y']>=message['y']+message['height']+19,(bounds,message)
  assert bounds['y']+bounds['height']<=composer['y']-19,(bounds,composer)
  page.screenshot(path=str(OUT/'tokyo-narrow-empty-space.png'))
@@ -111,12 +133,14 @@ with sync_playwright() as p:
  assert page.locator('#chatdrobe-environment').evaluate("node=>node.hidden&&getComputedStyle(node).display==='none'&&node.getClientRects().length===0"),'Blocked world must have no painted layout box despite :host display styles'
  page.evaluate("document.querySelector('.markdown').style.height=''")
  wait_for_state(page,"()=>{const d=env.diagnostics();return d.visible&&d.layout?.fallback==='conversation-gap';}")
+ wait_for_painted_gap(page)
  assert page.locator('#chatdrobe-environment').is_visible(),'Cleared obstruction restores actual artwork, not only diagnostics'
  page.evaluate("const n=document.createElement('nav');n.id='native-overlay';n.style.cssText='position:fixed;left:210px;right:0;top:250px;bottom:100px';document.body.append(n)")
  wait_for_state(page,"env.diagnostics().state==='blocked'")
  assert not page.locator('#chatdrobe-environment').is_visible(),'Native overlay must remove world paint'
  page.evaluate("document.querySelector('#native-overlay').remove()")
  wait_for_state(page,"()=>{const d=env.diagnostics();return d.visible&&d.layout?.fallback==='conversation-gap';}")
+ wait_for_painted_gap(page)
  assert page.locator('#chatdrobe-environment').is_visible()
  passed('Narrow fallback stays between measured message/composer and withdraws for growth or native overlays')
  for i in range(12):page.evaluate("env.configure({...roomPrefs,enabled:false});applyRoom({livingMotion:true})")
