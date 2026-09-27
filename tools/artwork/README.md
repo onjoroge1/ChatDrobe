@@ -1,9 +1,17 @@
-# Tokyo artwork production
+# Curated world artwork production
 
-The first curated world keeps the existing Tokyo city, reading desk and natural
-cat, and adds two calm potted plants from DiceBear's CC0 Sprouts collection. The
-companion is still ChatDrobe's original articulated cat; these plants are props,
-not a replacement avatar. This keeps one consistent warm, botanical palette.
+One locked DiceBear package now supplies selected vector components for three
+worlds. These are authored compositions, not random avatars generated at runtime.
+
+| World | Collection | Selected components |
+| --- | --- | --- |
+| Tokyo | Sprouts | Palm/cylinder and sprout/bowl plants in jade and terracotta. |
+| Train | Landscape | Three organic hill contours, mapped to the existing journey and lighting palettes. The original mountains, trees, cottage and carriage remain. |
+| Starship | Planets | Terra, cratered and banded surfaces for Earth, Moon and Jupiter, plus soft shading. Asteroid and deep-space stages remain; no Saturn rings are added to Earth or Jupiter. |
+
+The original articulated ChatDrobe cat remains shared by Tokyo, Train and Natural
+Cat. DiceBear does not supply its rig or finite motion clips. Lottie remains the
+separate Tokyo steam pilot; these new world components do not load another player.
 
 ## Reproduce the checked-in artwork
 
@@ -15,32 +23,44 @@ npm --prefix tools/artwork run generate
 ```
 
 Normal website/extension builds need neither this dependency nor network access.
-Only `tokyo-plant-art.mjs` (static curated SVG geometry) and `tokyo-nook.mjs` (DOM
-assembly) ship. Both extension and website use the same `quiet-scene.mjs` world.
-There is no CDN request, avatar API, inline source-SVG injection, random generation
-at page load, or upstream animation running beside the companion scheduler.
+Only selected geometry and its small assembly modules ship. Extension and website
+use the same `quiet-scene.mjs` world. No CDN request, avatar API, source-SVG
+injection, runtime random generation or upstream animation stylesheet is included.
 
-The generator reads the exact locked `@dicebear/styles@10.6.0` definition, checks
-the CC0 dedication, selects palm/cylinder and sprout/bowl components, resolves
-colors, prefixes SVG IDs, and rejects unapproved tags, attributes and external
-references. It writes the output checksum and source checksum to
-`browser-extension/extension/living/art/art-sources.json`.
+The generator reads exact locked `@dicebear/styles@10.6.0` definitions, requires
+CC0 for each chosen collection, resolves palette colors, prefixes SVG IDs and
+rejects unapproved tags, attributes and external references. It strips only the
+Planets `dbpa-surface` class, whose upstream animation is deliberately omitted.
+Only inert SVG shapes, local clipping and the required local radial gradient are
+allowed. All other unknown classes or animation primitives fail generation.
+
+- `art-sources.json`: Tokyo source definition, selections and output checksum.
+- `world-art-sources.json`: separate Landscape and Planets definitions, selections,
+  licenses, source checksums and shared output checksum.
+- `ARTWORK-LICENSE.txt`: notices packaged alongside the generated artwork.
+
+Train's original landscape motion container, stage transitions and day/dusk/night
+variables remain in charge. Its paths extend from x=-1050 to x=2050 in the 1000-wide
+scene, covering the existing 100px pan without revealing the edge. Static city
+window rectangles are consolidated into one same-paint path, as in Tokyo, to keep
+all worlds within the unchanged 320-node scene budget.
 
 ## Art direction and expansion
 
-- Leaves use muted jade; pots use terracotta/cream, with day/dusk/night variants.
-- Retain the companion's silhouette and individual finite actions.
-- Keep decorative props outside reading/composer areas using the scene placement.
-- Before another world, review the art in full, portal and compact habitats, at
-  day/dusk/night and with Still/reduced motion. Check SVG ID resolution and node
-  budgets as well as appearance. Do not count library adoption as visual approval.
-- Add a new collection only with its own source/version/license record. The
-  DiceBear runtime's MIT license does not license every artwork collection.
+- Judge the cat silhouette and world composition at compact size before closeups.
+- Preserve the native conversation/composer clearance and quiet-motion policy.
+- Review full, portal and compact habitats; all journey chapters; day/dusk/night;
+  and Still/reduced motion. Check SVG references and node budgets alongside paint.
+- Do not count an installed collection as a finished visual integration. The same
+  authoring package also contains Constellation, Critters and Open Peeps definitions;
+  they are not compiled into these worlds. Each future selection needs its own
+  provenance, license and visual review.
+- A collection's artwork license is separate from DiceBear's runtime MIT license.
+  Updating the authoring dependency requires regenerating and reviewing the diff.
 
-Primary sources verified for this integration:
+Primary source URLs are recorded with the shipped manifests:
 https://www.dicebear.com/styles/sprouts/
+https://www.dicebear.com/styles/landscape/
+https://www.dicebear.com/styles/planets/
 https://www.dicebear.com/licenses/
 https://github.com/dicebear/styles
-
-The authoring dependency is isolated from website/server production dependencies.
-Updating it requires regenerating and reviewing the artwork diff and licenses.
